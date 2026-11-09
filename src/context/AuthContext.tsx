@@ -9,7 +9,16 @@ import {
   signInWithEmailAndPassword,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  query,
+  collection,
+  where,
+  getDocs,
+} from 'firebase/firestore';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -44,14 +53,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [needsProfileCompletion, setNeedsProfileCompletion] = useState<boolean>(false);
 
-  // Check admin status against /adminUsers/{uid} or /admins/{uid}
-  const checkAdminRole = useCallback(async (uid: string): Promise<boolean> => {
+  // Check admin status against /adminUsers or /admins by UID, Email, or field query
+  const checkAdminRole = useCallback(async (uid: string, email?: string | null): Promise<boolean> => {
     if (!db) return false;
     try {
-      const adminSnap1 = await getDoc(doc(db, 'adminUsers', uid));
-      if (adminSnap1.exists()) return true;
-      const adminSnap2 = await getDoc(doc(db, 'admins', uid));
-      if (adminSnap2.exists()) return true;
+      // 1. Check by UID in admin collections
+      const uidDoc1 = await getDoc(doc(db, 'adminUsers', uid));
+      if (uidDoc1.exists()) {
+        const d = uidDoc1.data();
+        if (!d.role || d.role.toLowerCase() === 'admin') return true;
+      }
+      const uidDoc2 = await getDoc(doc(db, 'admins', uid));
+      if (uidDoc2.exists()) {
+        const d = uidDoc2.data();
+        if (!d.role || d.role.toLowerCase() === 'admin') return true;
+      }
+
+      // 2. Check by Email as document ID or query field
+      if (email) {
+        const cleanEmail = email.trim();
+        const lowerEmail = cleanEmail.toLowerCase();
+
+        const emailDoc1 = await getDoc(doc(db, 'adminUsers', cleanEmail));
+        if (emailDoc1.exists()) return true;
+
+        const emailDoc2 = await getDoc(doc(db, 'adminUsers', lowerEmail));
+        if (emailDoc2.exists()) return true;
+
+        const emailDoc3 = await getDoc(doc(db, 'admins', cleanEmail));
+        if (emailDoc3.exists()) return true;
+
+        const emailDoc4 = await getDoc(doc(db, 'admins', lowerEmail));
+        if (emailDoc4.exists()) return true;
+
+        // Query by email field
+        try {
+          const q1 = query(collection(db, 'adminUsers'), where('email', '==', cleanEmail));
+          const snap1 = await getDocs(q1);
+          if (!snap1.empty) return true;
+
+          const q2 = query(collection(db, 'adminUsers'), where('email', '==', lowerEmail));
+          const snap2 = await getDocs(q2);
+          if (!snap2.empty) return true;
+
+          const q3 = query(collection(db, 'admins'), where('email', '==', cleanEmail));
+          const snap3 = await getDocs(q3);
+          if (!snap3.empty) return true;
+
+          const q4 = query(collection(db, 'admins'), where('email', '==', lowerEmail));
+          const snap4 = await getDocs(q4);
+          if (!snap4.empty) return true;
+        } catch {
+          // ignore query permission errors
+        }
+      }
+
+      // 3. Check user profile's own role attribute
+      const userSnap = await getDoc(doc(db, 'users', uid));
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        if (
+          data.role?.toLowerCase() === 'admin' ||
+          data.isAdmin === true ||
+          data.role === 'Admin'
+        ) {
+          return true;
+        }
+      }
     } catch (err) {
       console.warn('Admin check error:', err);
     }
@@ -67,7 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userRef = doc(db, 'users', fbUser.uid);
         const snap = await getDoc(userRef);
 
-        const adminStatus = await checkAdminRole(fbUser.uid);
+        const adminStatus = await checkAdminRole(fbUser.uid, fbUser.email);
         setIsAdmin(adminStatus);
 
         if (snap.exists()) {
@@ -219,7 +287,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!params.fullName.trim()) {
       return { success: false, error: 'Please enter your full legal name.' };
     }
-    if (!params.phoneNumber.trim() || params.phoneNumber.trim().length < 8) {
+    const cleanPhone = params.phoneNumber.trim().replace(/[^0-9]/g, '');
+    if (cleanPhone.length < 8) {
       return { success: false, error: 'Please enter a valid Nepali mobile number (at least 8 digits).' };
     }
     if (!params.email.includes('@')) {
@@ -236,6 +305,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Firebase is not initialized.' };
     }
 
+    // Prevent duplicate phone numbers across accounts
+    try {
+      const phoneSnap = await getDoc(doc(db, 'phoneRegistry', cleanPhone));
+      if (phoneSnap.exists()) {
+        return {
+          success: false,
+          error: 'This mobile number is already registered to another player account. Each phone number can only be used once.',
+        };
+      }
+    } catch (err) {
+      console.warn('Phone uniqueness check error:', err);
+    }
+
     try {
       const cred = await createUserWithEmailAndPassword(auth, params.email.trim(), params.password);
       const uid = cred.user.uid;
@@ -245,7 +327,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid,
         fullName: params.fullName.trim(),
         email: params.email.trim().toLowerCase(),
-        phoneNumber: params.phoneNumber.trim(),
+        phoneNumber: cleanPhone,
         authProvider: 'password',
         role: 'customer',
         createdAt: nowIso,
@@ -257,6 +339,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAtServer: serverTimestamp(),
         updatedAtServer: serverTimestamp(),
       });
+
+      // Claim phone number in registry
+      try {
+        await setDoc(doc(db, 'phoneRegistry', cleanPhone), {
+          uid,
+          email: params.email.trim().toLowerCase(),
+          createdAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('Failed to write phone registry:', err);
+      }
 
       setUser(profile);
       setNeedsProfileCompletion(false);
@@ -304,14 +397,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     phoneNumber: string;
   }): Promise<{ success: boolean; error?: string }> => {
     if (!user) return { success: false, error: 'Not authenticated.' };
-    if (!data.phoneNumber.trim() || data.phoneNumber.trim().length < 8) {
+    const cleanPhone = data.phoneNumber.trim().replace(/[^0-9]/g, '');
+    if (cleanPhone.length < 8) {
       return { success: false, error: 'Please enter a valid phone number (at least 8 digits).' };
+    }
+
+    if (isFirebaseConfigured && db) {
+      try {
+        const phoneSnap = await getDoc(doc(db, 'phoneRegistry', cleanPhone));
+        if (phoneSnap.exists() && phoneSnap.data()?.uid !== user.uid) {
+          return {
+            success: false,
+            error: 'This mobile number is already registered to another player account. Please use your own unique number.',
+          };
+        }
+
+        // Claim phone in registry
+        await setDoc(doc(db, 'phoneRegistry', cleanPhone), {
+          uid: user.uid,
+          email: user.email,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('Phone registry check error:', err);
+      }
     }
 
     const updated: UserProfile = {
       ...user,
       fullName: data.fullName.trim() || user.fullName,
-      phoneNumber: data.phoneNumber.trim(),
+      phoneNumber: cleanPhone,
       updatedAt: new Date().toISOString(),
     };
 

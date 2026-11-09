@@ -162,30 +162,35 @@ export const HomePage: React.FC = () => {
           </div>
 
           {/* Right Visual Card */}
-          <div className="lg:col-span-5 bg-surface-50 rounded-2xl border border-surface-200 p-8 shadow-card space-y-6">
-            <div className="aspect-[4/3] w-full rounded-xl bg-gradient-to-br from-emerald-900 to-surface-900 flex flex-col items-center justify-center text-white p-6 relative overflow-hidden text-center">
-              <div className="absolute inset-3 border border-white/20 rounded-lg flex items-center justify-center">
-                <div className="w-20 h-20 rounded-full border border-white/20"></div>
+          <div className="lg:col-span-5 bg-surface-50 rounded-2xl border border-surface-200 p-4 sm:p-6 shadow-card space-y-4">
+            <div className="aspect-[4/3] w-full rounded-2xl overflow-hidden relative shadow-md group">
+              <img
+                src="/images/turf-lighting-night.webp"
+                alt="Maya Sports Centre Covered Turf Arena"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent flex flex-col justify-end p-5 text-white">
+                <span className="text-[10px] uppercase font-black tracking-widest text-emerald-400">
+                  Actual Playing Ground
+                </span>
+                <h3 className="text-xl font-black tracking-tight">
+                  Maya Sports Centre
+                </h3>
+                <span className="text-xs text-surface-200 font-medium">
+                  {BUSINESS_INFO.tagline} • Hetauda
+                </span>
               </div>
-              <span className="relative z-10 text-[11px] uppercase font-bold tracking-widest text-emerald-300 mb-1">
-                Venue Positioning
-              </span>
-              <h3 className="relative z-10 text-2xl font-extrabold tracking-tight">
-                Maya Sports Centre
-              </h3>
-              <span className="relative z-10 text-xs text-emerald-200/90 mt-1">
-                Hetauda's No. 1 Sports Centre
-              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-white border border-surface-200">
-                <span className="text-xl font-extrabold text-surface-900 block">11 Slots</span>
-                <span className="text-[11px] text-surface-500">Every Single Day</span>
+              <div className="p-3.5 rounded-xl bg-white border border-surface-200 shadow-subtle">
+                <span className="text-lg font-black text-surface-900 block">11 Slots</span>
+                <span className="text-[11px] text-surface-500 font-medium">10 AM – 9 PM Daily</span>
               </div>
-              <div className="p-3.5 rounded-xl bg-white border border-surface-200">
-                <span className="text-xl font-extrabold text-emerald-700 block">7 Days</span>
-                <span className="text-[11px] text-surface-500">Weekly Schedule</span>
+              <div className="p-3.5 rounded-xl bg-white border border-surface-200 shadow-subtle">
+                <span className="text-lg font-black text-emerald-700 block">Covered Arena</span>
+                <span className="text-[11px] text-surface-500 font-medium">All-Weather Play</span>
               </div>
             </div>
           </div>
@@ -245,44 +250,68 @@ export const HomePage: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           
-          {/* Card 1 */}
-          <div className="rounded-2xl border border-surface-200 bg-white overflow-hidden shadow-subtle">
-            <div className="h-44 bg-gradient-to-br from-emerald-950 via-emerald-900 to-surface-900 flex flex-col items-center justify-center text-emerald-200 p-4 text-center">
-              <span className="text-xs uppercase font-bold tracking-wider text-emerald-400">Turf Surface</span>
-              <span className="text-base font-bold text-white mt-1">Well-Maintained Artificial Turf</span>
-              <span className="text-[11px] text-surface-400 mt-1">Cushioned and brushed regularly</span>
+          {/* Card 1: Normal Turf Playing Ground (Futsal in action) */}
+          <div className="rounded-3xl border border-surface-200 bg-white overflow-hidden shadow-card hover:shadow-floating transition-all duration-300 group">
+            <div className="aspect-[4/3] w-full overflow-hidden relative bg-surface-900">
+              <img
+                src="/images/futsal-turf-match.webp"
+                alt="Maya Sports Centre Daytime Match Turf"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-108"
+                loading="lazy"
+              />
+              <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-emerald-900/90 text-white text-[10px] font-black uppercase tracking-wider backdrop-blur-sm border border-emerald-500/30">
+                Match Turf Ground
+              </span>
             </div>
-            <div className="p-4">
-              <h4 className="text-xs font-bold text-surface-900">Ground Quality</h4>
-              <p className="text-[11px] text-surface-500 mt-0.5">Comfortable traction for both 5v5 and 6v6 match play.</p>
-            </div>
-          </div>
-
-          {/* Card 2 */}
-          <div className="rounded-2xl border border-surface-200 bg-white overflow-hidden shadow-subtle">
-            <div className="h-44 bg-gradient-to-br from-surface-900 via-slate-900 to-emerald-950 flex flex-col items-center justify-center text-amber-200 p-4 text-center">
-              <span className="text-xs uppercase font-bold tracking-wider text-amber-400">Evening Play</span>
-              <span className="text-base font-bold text-white mt-1">LED Floodlighting</span>
-              <span className="text-[11px] text-surface-400 mt-1">Full visibility until 9:00 PM</span>
-            </div>
-            <div className="p-4">
-              <h4 className="text-xs font-bold text-surface-900">Night Visibility</h4>
-              <p className="text-[11px] text-surface-500 mt-0.5">High-lumen LED lights covering the entire court boundary.</p>
+            <div className="p-5 space-y-1">
+              <h4 className="text-sm font-black text-surface-900">Covered Futsal Turf Pitch</h4>
+              <p className="text-xs text-surface-500 leading-relaxed">
+                Full-size synthetic turf with spectator seating, perimeter netting, and comfortable footing.
+              </p>
             </div>
           </div>
 
-          {/* Card 3 */}
-          <div className="rounded-2xl border border-surface-200 bg-white overflow-hidden shadow-subtle">
-            <div className="h-44 bg-gradient-to-br from-surface-800 to-surface-950 flex flex-col items-center justify-center text-emerald-300 p-4 text-center">
-              <span className="text-xs uppercase font-bold tracking-wider text-emerald-400">Venue Access</span>
-              <span className="text-base font-bold text-white mt-1">Parking & Amenities</span>
-              <span className="text-[11px] text-surface-400 mt-1">Easy vehicular arrival in Hetauda</span>
+          {/* Card 2: LED Evening Floodlighting */}
+          <div className="rounded-3xl border border-surface-200 bg-white overflow-hidden shadow-card hover:shadow-floating transition-all duration-300 group">
+            <div className="aspect-[4/3] w-full overflow-hidden relative bg-surface-900">
+              <img
+                src="/images/turf-lighting-night.webp"
+                alt="Maya Sports Centre LED Floodlights at Night"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-108"
+                loading="lazy"
+              />
+              <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-amber-900/90 text-amber-200 text-[10px] font-black uppercase tracking-wider backdrop-blur-sm border border-amber-500/30">
+                Evening Floodlights
+              </span>
             </div>
-            <div className="p-4">
-              <h4 className="text-xs font-bold text-surface-900">Parking on Site</h4>
-              <p className="text-[11px] text-surface-500 mt-0.5">Convenient spot to park your bike or car during game time.</p>
+            <div className="p-5 space-y-1">
+              <h4 className="text-sm font-black text-surface-900">Bright LED Night Visibility</h4>
+              <p className="text-xs text-surface-500 leading-relaxed">
+                Roof-mounted overhead floodlights offering bright, shadow-balanced lighting for games until 9:00 PM.
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: Cricket Turf Nets & Pitch */}
+          <div className="rounded-3xl border border-surface-200 bg-white overflow-hidden shadow-card hover:shadow-floating transition-all duration-300 group sm:col-span-2 lg:col-span-1">
+            <div className="aspect-[4/3] w-full overflow-hidden relative bg-surface-900">
+              <img
+                src="/images/cricket-turf-pitch.webp"
+                alt="Maya Sports Centre Indoor Cricket Turf Pitch"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-108"
+                loading="lazy"
+              />
+              <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-surface-900/90 text-emerald-300 text-[10px] font-black uppercase tracking-wider backdrop-blur-sm border border-white/20">
+                Cricket Turf Pitch
+              </span>
+            </div>
+            <div className="p-5 space-y-1">
+              <h4 className="text-sm font-black text-surface-900">Indoor Cricket Practice Turf</h4>
+              <p className="text-xs text-surface-500 leading-relaxed">
+                Turf bowling crease with regulation stumps and high-safety netting for batting and bowling sessions.
+              </p>
             </div>
           </div>
 

@@ -9,6 +9,7 @@ import { Footer } from '@/components/layout/Footer';
 import { HomePage } from '@/pages/public/HomePage';
 import { SportSelectPage } from '@/pages/booking/SportSelectPage';
 import { FutsalBookingPage } from '@/pages/booking/FutsalBookingPage';
+import { OrderDetailsPage } from '@/pages/booking/OrderDetailsPage';
 import { CustomerBookingsPage } from '@/pages/customer/CustomerBookingsPage';
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
 
@@ -24,6 +25,8 @@ export const App: React.FC = () => {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/book" element={<SportSelectPage />} />
                 <Route path="/book/futsal" element={<FutsalBookingPage />} />
+                <Route path="/order/:orderId" element={<OrderDetailsPage />} />
+                <Route path="/booking/order/:orderId" element={<OrderDetailsPage />} />
                 <Route path="/customer/bookings" element={<CustomerBookingsPage />} />
                 <Route path="/admin" element={<AdminDashboardPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

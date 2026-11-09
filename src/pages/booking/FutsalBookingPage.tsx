@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useBooking } from '@/context/BookingContext';
 import { CourtSlot, BookingOrder } from '@/types';
 import { DatePicker } from '@/components/booking/DatePicker';
@@ -32,14 +32,16 @@ export const FutsalBookingPage: React.FC = () => {
       o.status !== 'expired'
   );
 
+  const navigate = useNavigate();
+
   const handleSlotClick = (slot: CourtSlot) => {
     setSelectedSlot(slot);
     setIsConfirmModalOpen(true);
   };
 
   const handleBookingConfirmed = (order: BookingOrder) => {
-    setConfirmedOrder(order);
-    setIsSuccessModalOpen(true);
+    setIsConfirmModalOpen(false);
+    navigate(`/order/${order.id}`);
   };
 
   return (

@@ -184,7 +184,9 @@ export const CustomerBookingsPage: React.FC = () => {
 
                     <div>
                       <span className="text-surface-500 block mb-0.5">Payment</span>
-                      <span className="font-semibold text-surface-700">Pay on Arrival</span>
+                      <span className="font-semibold text-surface-700">
+                        {order.paymentMethod === 'pay_online' ? 'Online (eSewa/Khalti)' : 'Pay on Arrival'}
+                      </span>
                     </div>
                   </div>
 
@@ -200,32 +202,45 @@ export const CustomerBookingsPage: React.FC = () => {
                         </span>
                       </div>
 
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold"
-                        onClick={() => handleCopyCode(order.bookingCode!)}
-                        leftIcon={
-                          copiedCode === order.bookingCode ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )
-                        }
-                      >
-                        {copiedCode === order.bookingCode ? 'Copied' : 'Copy Code'}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold"
+                          onClick={() => handleCopyCode(order.bookingCode!)}
+                          leftIcon={
+                            copiedCode === order.bookingCode ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )
+                          }
+                        >
+                          {copiedCode === order.bookingCode ? 'Copied' : 'Copy Code'}
+                        </Button>
+                        <Link to={`/order/${order.id}`}>
+                          <Button size="sm" variant="primary" className="bg-emerald-700 hover:bg-emerald-800 font-bold">
+                            Live Pass →
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   )}
 
                   {/* Pending explanation */}
                   {isPending && (
-                    <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
-                      <Clock className="w-4 h-4 shrink-0 text-amber-700 mt-0.5" />
-                      <span>
-                        Our venue staff is reviewing your slot. They may call your number (
-                        <strong>{order.customerPhone}</strong>) to confirm your match attendance.
-                      </span>
+                    <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-2">
+                        <Clock className="w-4 h-4 shrink-0 text-amber-700 mt-0.5" />
+                        <span>
+                          Our venue staff will call your number (<strong>{order.customerPhone}</strong>) within 5 minutes to verify your match attendance.
+                        </span>
+                      </div>
+                      <Link to={`/order/${order.id}`} className="shrink-0">
+                        <Button size="sm" variant="outline" className="border-amber-400 text-amber-950 bg-white font-bold w-full sm:w-auto">
+                          Live Status Radar →
+                        </Button>
+                      </Link>
                     </div>
                   )}
 
