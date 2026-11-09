@@ -1,0 +1,27 @@
+{
+  "name": "Maya Sports Centre",
+  "short_name": "Maya Sports",
+  "description": "Hetauda's No. 1 Sports Destination. Book futsal & cricket courts instantly.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#047857",
+  "lang": "en-US",
+  "categories": ["sports", "lifestyle"],
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -30,6 +30,7 @@ import {
   TrendingUp,
   Copy,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +45,7 @@ export const AdminDashboardPage: React.FC = () => {
     setSelectedDate,
     adminApproveBooking,
     adminRejectBooking,
+    adminCancelBooking,
     adminCreateManualBooking,
   } = useBooking();
 
@@ -84,6 +86,17 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Approve confirmation modal state
   const [approvingOrder, setApprovingOrder] = useState<BookingOrder | null>(null);
+
+  // Cancel / Release slot confirmation modal state
+  const [cancelingTarget, setCancelingTarget] = useState<{
+    id: string;
+    slotId?: string;
+    name: string;
+    date: string;
+    time: string;
+    code?: string;
+  } | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   // Hourly slots (10:00 AM to 9:00 PM)
   const availableSlotTimes = useMemo(() => {
@@ -169,6 +182,28 @@ export const AdminDashboardPage: React.FC = () => {
     setProcessingId(null);
     setRejectingOrder(null);
     setRejectionReason('');
+  };
+
+  // Cancel / Release slot action
+  const handleCancelClick = (target: {
+    id: string;
+    slotId?: string;
+    name: string;
+    date: string;
+    time: string;
+    code?: string;
+  }) => {
+    setCancelingTarget(target);
+    setCancelReason('');
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!cancelingTarget) return;
+    setProcessingId(cancelingTarget.id);
+    await adminCancelBooking(cancelingTarget.id, cancelReason);
+    setProcessingId(null);
+    setCancelingTarget(null);
+    setCancelReason('');
   };
 
   // Manual Walk-in creation
@@ -301,10 +336,122 @@ export const AdminDashboardPage: React.FC = () => {
 
   // ─── GOD-LEVEL SIDEBAR + CONTENT WORKSPACE ───
   return (
-    <div className="flex h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] bg-surface-50 overflow-hidden">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] bg-surface-50 overflow-hidden">
 
-      {/* ─── LEFT SIDEBAR NAVIGATION ─── */}
-      <aside className="w-64 sm:w-72 bg-surface-900 text-surface-300 border-r border-surface-800 flex flex-col justify-between shrink-0 select-none overflow-y-auto">
+      {/* ─── MOBILE ADMIN TOP HORIZONTAL NAVIGATION BAR (Visible < md) ─── */}
+      <div className="md:hidden bg-surface-900 text-surface-300 border-b border-surface-800 shrink-0 select-none">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-surface-800/80">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-black">
+              <Shield className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <span className="text-[11px] font-black text-white block uppercase leading-tight truncate max-w-[140px]">
+                {user.fullName || 'Venue Admin'}
+              </span>
+              <span className="text-[9px] text-emerald-400 font-bold block leading-none">
+                Staff Control Mode
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Link
+              to="/"
+              className="text-[10px] font-bold text-surface-400 hover:text-white px-2 py-1 rounded-md bg-surface-800"
+            >
+              Site ↗
+            </Link>
+            <button
+              onClick={logout}
+              className="text-[10px] font-bold text-red-400 hover:text-red-300 px-2 py-1 rounded-md bg-red-950/60"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable View Tabs on Mobile */}
+        <div className="flex items-center gap-1 px-2.5 py-1.5 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => setActiveView('overview')}
+            className={cn(
+              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
+              activeView === 'overview' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
+            )}
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            <span>Overview</span>
+          </button>
+          <button
+            onClick={() => setActiveView('approvals')}
+            className={cn(
+              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
+              activeView === 'approvals' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
+            )}
+          >
+            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <span>Queue</span>
+            {pendingOrders.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-amber-950">
+                {pendingOrders.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveView('courts')}
+            className={cn(
+              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
+              activeView === 'courts' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
+            )}
+          >
+            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Courts</span>
+          </button>
+          <button
+            onClick={() => setActiveView('manual')}
+            className={cn(
+              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
+              activeView === 'manual' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
+            )}
+          >
+            <PlusCircle className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Walk-in</span>
+          </button>
+          <button
+            onClick={() => setActiveView('orders')}
+            className={cn(
+              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
+              activeView === 'orders' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
+            )}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Ledger</span>
+          </button>
+          <button
+            onClick={() => setActiveView('revenue')}
+            className={cn(
+              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
+              activeView === 'revenue' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
+            )}
+          >
+            <Banknote className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Revenue</span>
+          </button>
+          <button
+            onClick={() => setActiveView('customers')}
+            className={cn(
+              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
+              activeView === 'customers' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
+            )}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Players</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ─── DESKTOP LEFT SIDEBAR NAVIGATION (Visible md+) ─── */}
+      <aside className="hidden md:flex w-64 lg:w-72 bg-surface-900 text-surface-300 border-r border-surface-800 flex-col justify-between shrink-0 select-none overflow-y-auto">
         <div>
           {/* Admin Identity Card */}
           <div className="p-5 border-b border-surface-800/80">
@@ -469,7 +616,7 @@ export const AdminDashboardPage: React.FC = () => {
       </aside>
 
       {/* ─── RIGHT CONTENT WORKSPACE ─── */}
-      <main className="flex-1 p-6 sm:p-10 overflow-y-auto h-full">
+      <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-y-auto h-full">
 
         {/* 1. OVERVIEW & METRICS */}
         {activeView === 'overview' && (
@@ -770,9 +917,29 @@ export const AdminDashboardPage: React.FC = () => {
 
                     <div className="mt-3 pt-2 border-t border-current/15 text-xs">
                       {slot.customerName ? (
-                        <div>
-                          <span className="font-bold block truncate">{slot.customerName}</span>
-                          <span className="text-[11px] opacity-75">{slot.customerPhone}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="overflow-hidden">
+                            <span className="font-bold block truncate">{slot.customerName}</span>
+                            <span className="text-[11px] opacity-75">{slot.customerPhone}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleCancelClick({
+                                id: slot.bookingId || slot.slotId,
+                                slotId: slot.slotId,
+                                name: slot.customerName || 'Player',
+                                date: slot.date,
+                                time: formatSlotTime(slot.startTime, slot.endTime),
+                                code: slot.bookingCode,
+                              })
+                            }
+                            className="p-1.5 rounded-lg bg-red-100/80 hover:bg-red-200 text-red-700 transition-colors shrink-0 flex items-center gap-1 text-[10px] font-bold"
+                            title="Cancel Booking & Free Slot"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Release</span>
+                          </button>
                         </div>
                       ) : (
                         <div className="flex justify-between items-center text-surface-500">
@@ -1004,16 +1171,43 @@ export const AdminDashboardPage: React.FC = () => {
                                 Declined
                               </span>
                             )}
+                            {order.status === 'cancelled' && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-surface-200 text-surface-700">
+                                Cancelled
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-4 font-bold text-surface-900">
                             {formatNPR(order.totalAmount)}
                           </td>
                           <td className="py-3 px-4 text-right">
-                            <Link to={`/order/${order.id}`} target="_blank">
-                              <Button size="sm" variant="outline" className="text-[11px] py-1 px-2.5">
-                                View Pass ↗
-                              </Button>
-                            </Link>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Link to={`/order/${order.id}`} target="_blank">
+                                <Button size="sm" variant="outline" className="text-[11px] py-1 px-2.5">
+                                  Pass ↗
+                                </Button>
+                              </Link>
+                              {(order.status === 'confirmed' || order.status === 'pending') && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleCancelClick({
+                                      id: order.id,
+                                      slotId: order.slotId,
+                                      name: order.customerName,
+                                      date: order.date,
+                                      time: formatSlotTime(order.startTime, order.endTime),
+                                      code: order.bookingCode,
+                                    })
+                                  }
+                                  className="p-1 px-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                                  title="Cancel Booking & Free Slot"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Cancel</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -1196,6 +1390,60 @@ export const AdminDashboardPage: React.FC = () => {
                 leftIcon={<CheckCircle2 className="w-4 h-4" />}
               >
                 Yes, Confirm Booking
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Cancel / Release Slot Confirmation Modal */}
+      {cancelingTarget && (
+        <Modal
+          isOpen={true}
+          onClose={() => setCancelingTarget(null)}
+          title="Cancel Booking & Release Slot"
+          description={`Are you sure you want to cancel ${cancelingTarget.name}'s booking on ${cancelingTarget.date} (${cancelingTarget.time})?`}
+        >
+          <div className="space-y-4">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 space-y-1.5">
+              <p className="font-bold text-red-950 flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+                This will immediately unlock the slot!
+              </p>
+              <p className="text-[11px] leading-relaxed">
+                Releasing this slot will delete the court lock and make this hour immediately available for other players or walk-in customers to book.
+              </p>
+              {cancelingTarget.code && (
+                <p className="font-mono font-bold pt-1">Code: {cancelingTarget.code}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-surface-700 uppercase mb-1">
+                Cancellation Reason (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Player requested cancellation / Team emergency"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-surface-200 text-xs"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setCancelingTarget(null)}>
+                Keep Booking
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 font-black text-white"
+                onClick={handleCancelConfirm}
+                isLoading={processingId === cancelingTarget.id}
+                leftIcon={<Trash2 className="w-4 h-4" />}
+              >
+                Yes, Release Slot
               </Button>
             </div>
           </div>

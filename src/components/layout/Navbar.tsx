@@ -66,7 +66,7 @@ export const Navbar: React.FC = () => {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-6">
+            <nav className="hidden lg:flex items-center gap-5 shrink-0">
               {navLinks.map((link) => (
                 <a
                   key={link.label}
@@ -79,13 +79,13 @@ export const Navbar: React.FC = () => {
             </nav>
 
             {/* Right Action Suite */}
-            <div className="hidden sm:flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2.5 shrink-0">
               {/* Order History Link */}
               <Link to="/customer/bookings">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="font-bold border-surface-300 text-surface-800 hover:bg-surface-100"
+                  className="font-bold border-surface-300 text-surface-800 hover:bg-surface-100 text-xs px-3"
                   leftIcon={<Clock className="w-3.5 h-3.5 text-emerald-700" />}
                 >
                   Order History
@@ -97,38 +97,41 @@ export const Navbar: React.FC = () => {
                 <Button
                   size="sm"
                   variant="primary"
-                  className="bg-emerald-700 hover:bg-emerald-800 font-bold"
+                  className="bg-emerald-700 hover:bg-emerald-800 font-bold text-xs px-3.5"
                   leftIcon={<Calendar className="w-4 h-4" />}
                 >
-                  Book Your Slot
+                  Book Slot
                 </Button>
               </Link>
 
-              {/* User Dropdown or Sign In */}
+              {/* User Section (Does not break layout when Admin is logged in) */}
               {user ? (
-                <div className="flex items-center gap-2 pl-2 border-l border-surface-200">
+                <div className="flex items-center gap-1.5 pl-2 border-l border-surface-200">
+                  {/* Subtle Admin Icon Shortcut (Compact, zero-shift) */}
                   {isAdmin && (
-                    <Link to="/admin">
-                      <Button size="sm" variant="secondary" leftIcon={<Shield className="w-3.5 h-3.5 text-emerald-700" />}>
-                        Admin
-                      </Button>
+                    <Link
+                      to="/admin"
+                      className="p-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                      title="Admin Dashboard"
+                    >
+                      <Shield className="w-4 h-4" />
                     </Link>
                   )}
 
                   <button
                     onClick={handleOpenProfile}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-surface-200 hover:bg-surface-50 transition-colors text-left"
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-surface-200 hover:bg-surface-50 transition-colors text-left"
                     title="View Profile"
                   >
                     <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
                       {user.fullName ? user.fullName[0].toUpperCase() : 'M'}
                     </div>
-                    <div className="hidden lg:block text-xs">
-                      <div className="font-semibold text-surface-800 leading-none truncate max-w-[100px]">
+                    <div className="hidden xl:block text-xs">
+                      <div className="font-semibold text-surface-800 leading-none truncate max-w-[90px]">
                         {user.fullName ? user.fullName.split(' ')[0] : 'Player'}
                       </div>
                       <span className="text-[10px] text-surface-500">
-                        {user.phoneNumber ? 'Verified' : 'Add Phone'}
+                        {isAdmin ? 'Staff / Admin' : user.phoneNumber ? 'Verified' : 'Add Phone'}
                       </span>
                     </div>
                   </button>
@@ -148,6 +151,7 @@ export const Navbar: React.FC = () => {
                     variant="outline"
                     onClick={() => setAuthModalOpen(true)}
                     leftIcon={<User className="w-4 h-4" />}
+                    className="text-xs px-3"
                   >
                     Sign In
                   </Button>
@@ -301,6 +305,19 @@ export const Navbar: React.FC = () => {
           {profileSaveSuccess && (
             <div className="flex items-center gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg">
               <CheckCircle className="w-4 h-4 text-emerald-600" /> Profile saved successfully!
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="pt-1">
+              <Link
+                to="/admin"
+                onClick={() => setProfileModalOpen(false)}
+                className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs font-bold hover:bg-emerald-100 transition-colors"
+              >
+                <Shield className="w-4 h-4 text-emerald-700" />
+                <span>Open Staff Command Center →</span>
+              </Link>
             </div>
           )}
 

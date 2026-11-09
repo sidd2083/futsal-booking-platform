@@ -44,13 +44,13 @@ export const HomePage: React.FC = () => {
 
           {/* Headline */}
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-surface-900 max-w-4xl mx-auto leading-[1.08]">
-            Quality Turf. Honest Pricing.{' '}
-            <span className="text-emerald-700 block sm:inline">Play Every Day.</span>
+            Hetauda's Premier Match Ground.{' '}
+            <span className="text-emerald-700 block sm:inline">Ready When You Are.</span>
           </h1>
 
           {/* Subtitle */}
           <p className="text-base sm:text-lg text-surface-600 max-w-2xl mx-auto mt-6 leading-relaxed">
-            Welcome to Maya Sports Centre. We provide well-maintained playing grounds, clear evening floodlights, and direct court reservations with Pay on Arrival.
+            Experience Hetauda's leading sports destination. Well-maintained playing turf, bright evening LED floodlights, and instant 1-hour court reservations with Pay on Arrival.
           </p>
 
           {/* Transparent Pricing Callout */}

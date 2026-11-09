@@ -47,6 +47,7 @@ interface BookingContextType {
   ) => Promise<{ success: boolean; error?: string; order?: BookingOrder }>;
   adminApproveBooking: (orderId: string) => Promise<{ success: boolean; error?: string }>;
   adminRejectBooking: (orderId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
+  adminCancelBooking: (orderIdOrSlotId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
   adminCreateManualBooking: (params: {
     date: string;
     startTime: string;
@@ -441,6 +442,62 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [orders]
   );
 
+  // Admin cancels a booking or slot (immediately freeing the court slot for new bookings)
+  const adminCancelBooking = useCallback(
+    async (orderIdOrSlotId: string, reason?: string): Promise<{ success: boolean; error?: string }> => {
+      const target = orders.find(
+        (o) => o.id === orderIdOrSlotId || o.slotId === orderIdOrSlotId || o.bookingCode === orderIdOrSlotId
+      );
+      const effectiveOrderId = target ? target.id : orderIdOrSlotId;
+      const effectiveSlotId = target?.slotId || (orderIdOrSlotId.includes('_') ? orderIdOrSlotId : null);
+
+      const firestore = db;
+      if (isFirebaseConfigured && firestore) {
+        try {
+          if (effectiveSlotId) {
+            const slotRef = doc(firestore, 'slots', effectiveSlotId);
+            await deleteDoc(slotRef).catch(() => {});
+          }
+
+          if (target) {
+            const orderRef = doc(firestore, 'bookings', effectiveOrderId);
+            await setDoc(
+              orderRef,
+              {
+                status: 'cancelled',
+                cancellationReason: reason || 'Cancelled by staff / player request',
+                cancelledAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                updatedAtServer: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          }
+        } catch (err: any) {
+          console.warn('Firestore cancel slot notice:', err);
+        }
+      }
+
+      // Immediately free the slot in local state
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === effectiveOrderId || (effectiveSlotId && o.slotId === effectiveSlotId)
+            ? {
+                ...o,
+                status: 'cancelled',
+                cancellationReason: reason || 'Cancelled by staff / player request',
+                cancelledAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
+            : o
+        )
+      );
+
+      return { success: true };
+    },
+    [orders]
+  );
+
   // Admin creates an offline/walk-in booking
   const adminCreateManualBooking = useCallback(
     async (params: {
@@ -614,6 +671,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         requestSlotBooking,
         adminApproveBooking,
         adminRejectBooking,
+        adminCancelBooking,
         adminCreateManualBooking,
       }}
     >

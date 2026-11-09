@@ -2,9 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Logo } from '@/components/common/Logo';
 import { BUSINESS_INFO } from '@/lib/constants';
-import { MapPin, Phone, Clock, ArrowRight, ExternalLink } from 'lucide-react';
+import { usePWA } from '@/context/PWAContext';
+import { MapPin, Phone, Clock, ArrowRight, ExternalLink, Download, Smartphone } from 'lucide-react';
 
 export const Footer: React.FC = () => {
+  const { promptInstall, isInstalled } = usePWA();
+
   return (
     <footer className="bg-surface-900 text-surface-300 pt-16 pb-12 border-t border-surface-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -83,20 +86,15 @@ export const Footer: React.FC = () => {
                   My Bookings & Verification Code
                 </Link>
               </li>
-              <li>
-                <Link to="/admin" className="text-surface-500 hover:text-surface-300 transition-colors">
-                  Staff Portal
-                </Link>
-              </li>
             </ul>
           </div>
 
-          {/* Location & Telephone Link */}
-          <div className="space-y-3">
-            <h4 className="text-xs uppercase tracking-wider font-bold text-white">
-              Venue Location & Contact
-            </h4>
+          {/* Location & Telephone Link + Download App CTA */}
+          <div className="space-y-4">
             <div className="space-y-2.5 text-xs text-surface-400">
+              <h4 className="text-xs uppercase tracking-wider font-bold text-white">
+                Venue Location & Contact
+              </h4>
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
@@ -115,7 +113,7 @@ export const Footer: React.FC = () => {
                 </a>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-1">
                 <a
                   href={BUSINESS_INFO.mapsUrl}
                   target="_blank"
@@ -126,6 +124,30 @@ export const Footer: React.FC = () => {
                   <ExternalLink className="w-3 h-3 text-emerald-400" />
                 </a>
               </div>
+            </div>
+
+            {/* PWA App Download Card */}
+            <div className="p-3.5 rounded-2xl bg-surface-800/80 border border-surface-700/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-white">
+                  <Smartphone className="w-4 h-4 text-emerald-400" />
+                  <span>Maya Sports App</span>
+                </div>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {isInstalled ? 'Installed' : 'PWA App'}
+                </span>
+              </div>
+              <p className="text-[11px] text-surface-400 leading-relaxed">
+                Add to your home screen for fast 1-tap bookings and offline ticket slips.
+              </p>
+              <button
+                type="button"
+                onClick={promptInstall}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{isInstalled ? 'Open Installed App' : 'Download Mobile App'}</span>
+              </button>
             </div>
           </div>
 
