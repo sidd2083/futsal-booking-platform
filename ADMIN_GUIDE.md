@@ -1,75 +1,53 @@
-# Administrator & Staff Operations Manual
+# Administrator & Staff Operations Manual — Maya Sports Centre
 
-## 1. Access & Authentication
+## 1. Access & Security Barrier
 
 - **Admin URL Route:** `/admin`
-- **Security Barrier:** Access restricted to accounts flagged in the Firestore `/admins/{uid}` collection or assigned custom admin claims in Firebase Auth.
-- **Unauthorized Handling:** Casual visitors attempting to navigate to `/admin` are redirected to the homepage or a 403 Access Denied screen.
+- **Access Control:**
+  - Visiting `/admin` renders a dedicated **Staff Authentication Screen**.
+  - Requires valid email/password credentials authenticated through Firebase Auth.
+  - The account UID must exist in Firestore `/adminUsers/{uid}`.
+  - Normal players attempting to access `/admin` receive an access denied notice.
+  - No passwords or administrative credentials are hardcoded into client code.
 
 ---
 
-## 2. Dashboard Sections & Workflows
+## 2. Setting Up the First Administrator Account
 
-### Section A: Executive Overview
-- Displays high-priority real-time cards:
-  - **Today's Revenue (NPR):** Sum of confirmed bookings for the current calendar day.
-  - **Weekly Revenue (NPR):** Sum of confirmed bookings for Monday – Sunday of current week.
-  - **Monthly Revenue (NPR):** Sum of confirmed bookings for current month.
-  - **Pending Approvals Count:** Prominent badge with direct shortcut to the approval queue.
-  - **Total Registered Players:** Registered customer accounts in the database.
-- **Strict Revenue Integrity:** Pending, rejected, and expired bookings are strictly excluded from all revenue totals.
-
----
-
-### Section B: Waiting for Approval Queue (Priority Desk)
-This is the central operational view for staff on duty.
-- **Queue Display:** List of all bookings currently with `status: "pending"`.
-- **Card/Row Data:**
-  - Customer Full Name
-  - Customer Phone Number (clickable `tel:` link for direct one-tap mobile dialing)
-  - Requested Sport & Court
-  - Requested Date & Time
-  - Total Fee (NPR)
-  - Time elapsed since submission
-- **Staff Actions:**
-  1. **Call Customer:** Staff phones the customer to confirm their attendance.
-  2. **Approve Button:**
-     - Generates booking confirmation code (e.g. `FT-4912`).
-     - Updates status to `confirmed`.
-     - Slot becomes permanently locked as booked.
-     - Customer's screen updates in real time to show confirmed code.
-  3. **Reject Button:**
-     - Prompts for brief reason (e.g., "Court booked offline", "Private tournament", "Weather closure").
-     - Releases the slot lock immediately.
-     - Updates customer status to `rejected`.
+1. Open `/admin` and click the registration modal or register your email.
+2. Go to the [Firebase Console](https://console.firebase.google.com/) -> Project `futsal-2f004`.
+3. In **Firestore Database**, create a document:
+   - Collection: `adminUsers`
+   - Document ID: `<Your Firebase Auth UID>`
+   - Fields:
+     - `email`: `"your-email@example.com"` (string)
+     - `role`: `"admin"` (string)
+     - `createdAt`: server timestamp
+4. Return to `/admin` and log in. You will immediately enter the Command Center.
 
 ---
+
+## 3. Operational Workflows
+
+### Section A: Waiting for Approval Queue (Priority Desk)
+- Central operational queue for duty staff.
+- Displays all customer requests currently with status `pending`.
+- Click the customer's phone number to directly dial on mobile or phone them.
+- **Approve:** Generates official booking verification code (e.g. `MS-7291`), confirms slot.
+- **Reject:** Prompts for reason (e.g., "Court booked offline"), updates status, and immediately frees the slot for other players.
+
+### Section B: Offline / Counter Desk
+- For walk-in customers or telephone callers.
+- Select reservation date within operating schedule (10:00 AM to 9:00 PM).
+- Select slot, enter customer name, and contact phone number.
+- Click **"Confirm Offline Reservation"**.
+- Atomically locks the slot and generates an official code.
 
 ### Section C: All Orders Ledger
-A comprehensive audit and query table of all bookings.
-- **Columns:** Booking ID, Code, Customer Name, Phone, Date, Time Slot, Price, Payment Method, Status.
-- **Filters:** By Date, Status (`Pending`, `Confirmed`, `Rejected`, `Expired`), Sport (`Futsal`, `Cricket`).
-- **Detail Modal:** Clicking any row opens the full order breakdown, including timestamps, payment records, and customer metadata.
+- Searchable by customer name, phone number, booking code, or order ID.
+- Filter by status (`Confirmed`, `Pending`, `Rejected`).
+- Inspect complete audit record on click.
 
----
-
-### Section D: Offline / Walk-in Booking Desk
-Empowers staff to take reservations over the counter or via incoming telephone calls.
-- **Workflow:**
-  1. Staff selects date.
-  2. Live grid displays slot availability.
-  3. Staff clicks any available (white) slot.
-  4. Quick modal opens:
-     - Input customer name (e.g., "Suman Shrestha").
-     - Input customer phone (e.g., "9841234567").
-     - Input optional staff note (e.g., "Phone reservation - advance paid in cash").
-  5. Click **"Confirm Manual Booking"**.
-  6. The slot is locked as `confirmed` immediately with an official booking code, preventing online players from booking over it.
-
----
-
-### Section E: Pricing & Business Settings Management
-Allows the owner to adjust business rules without touching code:
-- Update Normal Day Rate (Current: NPR 1,300).
-- Update Saturday Rate (Current: NPR 1,500).
-- Modify daily opening and closing hours.
+### Section D: Verified Revenue Reports
+- Strictly counts confirmed orders (excludes pending and rejected).
+- Displays Today's Revenue, This Week, This Month, All-Time, and Custom Date Range.

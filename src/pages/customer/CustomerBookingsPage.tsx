@@ -5,6 +5,7 @@ import { useBooking } from '@/context/BookingContext';
 import { formatNPR, formatSlotTime } from '@/lib/utils';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { AuthModal } from '@/components/common/AuthModal';
 import {
   Calendar,
   Clock,
@@ -17,9 +18,10 @@ import {
 } from 'lucide-react';
 
 export const CustomerBookingsPage: React.FC = () => {
-  const { user, loginWithGoogle } = useAuth();
+  const { user } = useAuth();
   const { userOrders } = useBooking();
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -39,9 +41,19 @@ export const CustomerBookingsPage: React.FC = () => {
         <p className="text-xs text-surface-600 leading-relaxed">
           Access your personal booking status, view confirmed unique codes, and track verification in real time.
         </p>
-        <Button variant="primary" size="lg" className="w-full" onClick={loginWithGoogle}>
-          Sign In with Google
+        <Button
+          variant="primary"
+          size="lg"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 font-bold"
+          onClick={() => setAuthModalOpen(true)}
+        >
+          Sign In / Register
         </Button>
+
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+        />
       </div>
     );
   }
@@ -52,12 +64,12 @@ export const CustomerBookingsPage: React.FC = () => {
       {/* Top Profile Header */}
       <div className="bg-white rounded-2xl border border-surface-200 p-6 sm:p-8 shadow-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-brand-100 text-brand-800 flex items-center justify-center font-extrabold text-xl shadow-sm">
-            {user.fullName ? user.fullName[0].toUpperCase() : 'P'}
+          <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-extrabold text-xl shadow-sm">
+            {user.fullName ? user.fullName[0].toUpperCase() : 'M'}
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-surface-900 tracking-tight">
-              {user.fullName}
+              {user.fullName || 'Player'}
             </h1>
             <div className="flex flex-wrap items-center gap-3 text-xs text-surface-500 mt-1">
               <span>{user.email}</span>
@@ -71,7 +83,7 @@ export const CustomerBookingsPage: React.FC = () => {
         </div>
 
         <Link to="/book">
-          <Button variant="primary" size="md" rightIcon={<ArrowRight className="w-4 h-4" />}>
+          <Button variant="primary" size="md" className="bg-emerald-700 hover:bg-emerald-800 font-bold" rightIcon={<ArrowRight className="w-4 h-4" />}>
             Book Another Slot
           </Button>
         </Link>
@@ -80,24 +92,24 @@ export const CustomerBookingsPage: React.FC = () => {
       {/* Bookings List */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-surface-900 tracking-tight">
+          <h2 className="text-base font-bold text-surface-900 tracking-tight">
             My Booking Slips ({userOrders.length})
           </h2>
           <span className="text-xs text-surface-500">
-            Present your confirmed code at counter
+            Show your code at the counter upon arrival
           </span>
         </div>
 
         {userOrders.length === 0 ? (
           <div className="bg-white rounded-2xl border border-surface-200 p-12 text-center space-y-4">
             <Calendar className="w-10 h-10 text-surface-300 mx-auto" />
-            <h3 className="text-base font-bold text-surface-900">No Bookings Found</h3>
+            <h3 className="text-base font-bold text-surface-900">No Reservations Found</h3>
             <p className="text-xs text-surface-500 max-w-sm mx-auto">
               You haven't requested any futsal slots yet. Browse available dates and reserve an hour.
             </p>
             <div className="pt-2">
               <Link to="/book">
-                <Button variant="primary" size="md">
+                <Button variant="primary" size="md" className="bg-emerald-700 hover:bg-emerald-800 font-bold">
                   Browse Available Slots
                 </Button>
               </Link>
@@ -133,17 +145,17 @@ export const CustomerBookingsPage: React.FC = () => {
                     <div>
                       {isConfirmed && (
                         <Badge variant="success" size="md" dot>
-                          Confirmed by Venue
+                          Confirmed by Staff
                         </Badge>
                       )}
                       {isPending && (
                         <Badge variant="warning" size="md" dot>
-                          Pending Staff Approval
+                          Pending Staff Verification
                         </Badge>
                       )}
                       {isRejected && (
                         <Badge variant="danger" size="md" dot>
-                          Request Rejected
+                          Request Declined
                         </Badge>
                       )}
                     </div>
@@ -165,23 +177,23 @@ export const CustomerBookingsPage: React.FC = () => {
 
                     <div>
                       <span className="text-surface-500 block mb-0.5">Amount Due</span>
-                      <span className="font-bold text-brand-700">
+                      <span className="font-bold text-emerald-800">
                         {formatNPR(order.totalAmount)}
                       </span>
                     </div>
 
                     <div>
-                      <span className="text-surface-500 block mb-0.5">Payment Method</span>
+                      <span className="text-surface-500 block mb-0.5">Payment</span>
                       <span className="font-semibold text-surface-700">Pay on Arrival</span>
                     </div>
                   </div>
 
-                  {/* Booking Code Presentation Banner */}
+                  {/* Booking Code Banner */}
                   {isConfirmed && order.bookingCode && (
                     <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div>
                         <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-800 block">
-                          Official Verification Code
+                          Official Booking Verification Code
                         </span>
                         <span className="text-2xl font-extrabold text-emerald-950 tracking-tight font-mono">
                           {order.bookingCode}
@@ -191,7 +203,7 @@ export const CustomerBookingsPage: React.FC = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+                        className="bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold"
                         onClick={() => handleCopyCode(order.bookingCode!)}
                         leftIcon={
                           copiedCode === order.bookingCode ? (
@@ -211,8 +223,8 @@ export const CustomerBookingsPage: React.FC = () => {
                     <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
                       <Clock className="w-4 h-4 shrink-0 text-amber-700 mt-0.5" />
                       <span>
-                        Our venue manager is reviewing your request. They may call your contact number (
-                        <strong>{order.customerPhone}</strong>) to confirm court availability.
+                        Our venue staff is reviewing your slot. They may call your number (
+                        <strong>{order.customerPhone}</strong>) to confirm your match attendance.
                       </span>
                     </div>
                   )}

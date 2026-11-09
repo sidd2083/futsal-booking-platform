@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
@@ -6,100 +6,117 @@ import { BUSINESS_INFO } from '@/lib/constants';
 import {
   Calendar,
   Clock,
-  Award,
-  Zap,
   MapPin,
   Phone,
   CheckCircle2,
   ArrowRight,
-  Users,
+  ExternalLink,
 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
+  const [inquirySubmitted, setInquirySubmitted] = useState(false);
+  const [inquiryName, setInquiryName] = useState('');
+  const [inquiryPhone, setInquiryPhone] = useState('');
+  const [inquiryMessage, setInquiryMessage] = useState('');
+
+  const handleInquirySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inquiryName || !inquiryPhone) return;
+    setInquirySubmitted(true);
+    setInquiryName('');
+    setInquiryPhone('');
+    setInquiryMessage('');
+    setTimeout(() => setInquirySubmitted(false), 4000);
+  };
+
   return (
     <div className="space-y-24 pb-20">
       
       {/* 1. HERO SECTION */}
-      <section className="relative pt-12 sm:pt-20 lg:pt-28 overflow-hidden bg-gradient-to-b from-surface-50 via-white to-white border-b border-surface-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 pb-16 sm:pb-24">
+      <section id="home" className="relative pt-12 sm:pt-20 lg:pt-24 pb-16 sm:pb-24 bg-gradient-to-b from-surface-50 via-white to-white border-b border-surface-200 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           
-          {/* Pill announcement badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-200 text-brand-800 text-xs font-semibold mb-6 animate-in fade-in slide-in-from-top-4 duration-300">
-            <span className="w-2 h-2 rounded-full bg-brand-600 animate-pulse"></span>
-            <span>Real-Time Court Availability • Kathmandu, Nepal</span>
+          {/* Natural Positioning Pill */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold mb-6">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+            <span>{BUSINESS_INFO.tagline} • Hetauda, Nepal</span>
           </div>
 
-          {/* High-impact headline */}
+          {/* Headline */}
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-surface-900 max-w-4xl mx-auto leading-[1.08]">
-            Premium Turf. Instant Slots.{' '}
-            <span className="text-brand-700 block sm:inline">Zero Friction.</span>
+            Quality Turf. Honest Pricing.{' '}
+            <span className="text-emerald-700 block sm:inline">Play Every Day.</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-base sm:text-xl text-surface-600 max-w-2xl mx-auto mt-6 leading-relaxed">
-            Reserve professional futsal courts in seconds. Check live hourly slots, submit your booking, and pay on arrival at the counter.
+          <p className="text-base sm:text-lg text-surface-600 max-w-2xl mx-auto mt-6 leading-relaxed">
+            Welcome to Maya Sports Centre. We provide well-maintained playing grounds, clear evening floodlights, and direct court reservations with Pay on Arrival.
           </p>
 
-          {/* Pricing Highlight Pill */}
-          <div className="flex flex-wrap items-center justify-center gap-4 my-8 text-xs sm:text-sm font-semibold">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-surface-200 shadow-subtle">
-              <span className="text-surface-500">Normal Days:</span>
+          {/* Transparent Pricing Callout */}
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 my-8 text-xs sm:text-sm font-semibold">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-surface-200 shadow-subtle">
+              <span className="text-surface-500">Sunday – Friday:</span>
               <span className="text-surface-900 font-bold">NPR 1,300 / hr</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-50 border border-brand-200 shadow-subtle">
-              <span className="text-brand-800 font-semibold">Saturday (Peak):</span>
-              <span className="text-brand-900 font-extrabold">NPR 1,500 / hr</span>
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 shadow-subtle">
+              <span className="text-emerald-800 font-semibold">Saturday:</span>
+              <span className="text-emerald-900 font-extrabold">NPR 1,500 / hr</span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-50 border border-surface-200 shadow-subtle text-surface-600">
+              <Clock className="w-4 h-4 text-emerald-700" />
+              <span>10:00 AM – 9:00 PM Daily</span>
             </div>
           </div>
 
-          {/* CTA Buttons */}
+          {/* Primary Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
             <Link to="/book" className="w-full sm:w-auto">
               <Button
                 size="lg"
                 variant="primary"
-                className="w-full sm:w-auto px-8 py-3.5 text-base shadow-card font-bold"
+                className="w-full sm:w-auto px-8 py-3.5 text-base font-bold bg-emerald-700 hover:bg-emerald-800 shadow-card"
                 leftIcon={<Calendar className="w-5 h-5" />}
               >
-                Book Your Slot Now
+                Book Your Slot
               </Button>
             </Link>
-            <a href="#amenities" className="w-full sm:w-auto">
+            <a href="#about" className="w-full sm:w-auto">
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full sm:w-auto px-6 py-3.5 text-base"
+                className="w-full sm:w-auto px-6 py-3.5 text-base font-semibold"
               >
-                Explore Pitch Specs
+                About Our Centre
               </Button>
             </a>
           </div>
 
-          {/* Key Value Guarantees */}
+          {/* Key Ground Truth Highlights */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto mt-14 pt-10 border-t border-surface-200 text-left">
             <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-brand-700 font-bold text-xs uppercase tracking-tight">
-                <CheckCircle2 className="w-3.5 h-3.5" /> FIFA-Grade Turf
+              <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs uppercase tracking-tight">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Well-Maintained Turf
               </div>
-              <p className="text-xs text-surface-500">50mm cushioned monofilament</p>
+              <p className="text-xs text-surface-500">Regularly cleaned and groomed</p>
             </div>
             <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-brand-700 font-bold text-xs uppercase tracking-tight">
-                <CheckCircle2 className="w-3.5 h-3.5" /> High-Lux Lights
+              <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs uppercase tracking-tight">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> LED Floodlighting
               </div>
-              <p className="text-xs text-surface-500">Flicker-free night play</p>
+              <p className="text-xs text-surface-500">Play until 9:00 PM every night</p>
             </div>
             <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-brand-700 font-bold text-xs uppercase tracking-tight">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Guaranteed Lock
+              <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs uppercase tracking-tight">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Dedicated Parking
               </div>
-              <p className="text-xs text-surface-500">Zero double bookings</p>
+              <p className="text-xs text-surface-500">On-site vehicle space</p>
             </div>
             <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-brand-700 font-bold text-xs uppercase tracking-tight">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Pay on Arrival
+              <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs uppercase tracking-tight">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Pay on Arrival
               </div>
-              <p className="text-xs text-surface-500">No advance payment needed</p>
+              <p className="text-xs text-surface-500">No prepayment barrier</p>
             </div>
           </div>
 
@@ -108,89 +125,67 @@ export const HomePage: React.FC = () => {
 
       {/* 2. ABOUT US SECTION */}
       <section id="about" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
-          <div className="space-y-6">
+          <div className="lg:col-span-7 space-y-6">
             <Badge variant="brand" size="md">
-              About Kathmandu Arena & Turf
+              About Maya Sports Centre
             </Badge>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-surface-900 leading-tight">
-              Engineered for Serious Players & Weekend Warriors Alike.
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-surface-900 leading-tight">
+              A Welcoming Sports Destination in Hetauda.
             </h2>
-            <p className="text-surface-600 leading-relaxed">
-              We built our futsal arena with one singular goal: to give football enthusiasts in Nepal an unmatched playing environment. From international-standard turf specifications to high-output floodlights and pristine amenities, every detail is crafted for peak athletic performance.
+            <p className="text-surface-600 leading-relaxed text-base">
+              Maya Sports Centre is a sports destination in Hetauda, dedicated to providing quality sports facilities and a great playing experience. We aim to give players, friends, families, and sports enthusiasts a welcoming place to enjoy their game with well-maintained grounds, quality facilities, and affordable pricing.
             </p>
-            
-            <div className="space-y-3 pt-2">
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs">
-                  ✓
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-surface-900">Shock-Absorbing Underlay</h4>
-                  <p className="text-xs text-surface-500">Designed to protect player knees and ankles against impact stress.</p>
-                </div>
-              </div>
+            <p className="text-surface-600 leading-relaxed text-sm">
+              As one of Hetauda’s leading sports destinations, we operate seven days a week with consistent opening hours from 10:00 AM to 9:00 PM. Whether you are gathering a regular squad after work, organizing weekend friendlies, or keeping active, our court is ready for you.
+            </p>
 
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs">
-                  ✓
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-surface-900">Tournament Dimension Court</h4>
-                  <p className="text-xs text-surface-500">Standard 5v5 and 6v6 field dimensions with official FIFA futsal markings.</p>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
+              <div className="p-3 rounded-xl bg-surface-50 border border-surface-200">
+                <span className="font-bold text-surface-900 block mb-0.5">Open 7 Days a Week</span>
+                <span className="text-surface-500">Consistent access Monday through Sunday.</span>
               </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs">
-                  ✓
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-surface-900">Covered Weather Protection</h4>
-                  <p className="text-xs text-surface-500">Rain or shine, play without weather disruptions under covered turf netting.</p>
-                </div>
+              <div className="p-3 rounded-xl bg-surface-50 border border-surface-200">
+                <span className="font-bold text-surface-900 block mb-0.5">Pay on Arrival</span>
+                <span className="text-surface-500">Reserve your hour online, settle at the counter.</span>
               </div>
             </div>
 
-            <div className="pt-4">
+            <div className="pt-2">
               <Link to="/book">
-                <Button variant="primary" size="md" rightIcon={<ArrowRight className="w-4 h-4" />}>
+                <Button variant="primary" size="md" className="bg-emerald-700 hover:bg-emerald-800 font-bold" rightIcon={<ArrowRight className="w-4 h-4" />}>
                   Check Slot Availability
                 </Button>
               </Link>
             </div>
           </div>
 
-          {/* Visual Showcase Card */}
-          <div className="bg-surface-50 rounded-2xl border border-surface-200 p-8 shadow-card space-y-6">
-            <div className="aspect-video w-full rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 flex flex-col items-center justify-center text-white p-6 relative overflow-hidden">
-              {/* Pitch Marking Graphics */}
-              <div className="absolute inset-4 border-2 border-white/30 rounded-lg flex items-center justify-center">
-                <div className="w-24 h-24 rounded-full border-2 border-white/30 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-white/60"></div>
-                </div>
-                <div className="absolute inset-y-0 left-1/2 border-r-2 border-white/30"></div>
+          {/* Right Visual Card */}
+          <div className="lg:col-span-5 bg-surface-50 rounded-2xl border border-surface-200 p-8 shadow-card space-y-6">
+            <div className="aspect-[4/3] w-full rounded-xl bg-gradient-to-br from-emerald-900 to-surface-900 flex flex-col items-center justify-center text-white p-6 relative overflow-hidden text-center">
+              <div className="absolute inset-3 border border-white/20 rounded-lg flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full border border-white/20"></div>
               </div>
-              <span className="relative z-10 text-xs uppercase font-bold tracking-widest text-emerald-300 mb-1">
-                Pitch Dimensions
+              <span className="relative z-10 text-[11px] uppercase font-bold tracking-widest text-emerald-300 mb-1">
+                Venue Positioning
               </span>
-              <span className="relative z-10 text-2xl font-extrabold tracking-tight">
-                38m × 18m Court
-              </span>
-              <span className="relative z-10 text-xs text-emerald-200/80 mt-1">
-                Standard 5v5 & 6v6 Match Play
+              <h3 className="relative z-10 text-2xl font-extrabold tracking-tight">
+                Maya Sports Centre
+              </h3>
+              <span className="relative z-10 text-xs text-emerald-200/90 mt-1">
+                Hetauda's No. 1 Sports Centre
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl bg-white border border-surface-200">
-                <span className="text-2xl font-extrabold text-surface-900 block">500+</span>
-                <span className="text-xs text-surface-500 font-medium">Matches Played Monthly</span>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-white border border-surface-200">
+                <span className="text-xl font-extrabold text-surface-900 block">11 Slots</span>
+                <span className="text-[11px] text-surface-500">Every Single Day</span>
               </div>
-              <div className="p-4 rounded-xl bg-white border border-surface-200">
-                <span className="text-2xl font-extrabold text-brand-700 block">16</span>
-                <span className="text-xs text-surface-500 font-medium">Hourly Slots Every Day</span>
+              <div className="p-3.5 rounded-xl bg-white border border-surface-200">
+                <span className="text-xl font-extrabold text-emerald-700 block">7 Days</span>
+                <span className="text-[11px] text-surface-500">Weekly Schedule</span>
               </div>
             </div>
           </div>
@@ -198,36 +193,36 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 3. AMENITIES & SPECIFICATIONS */}
-      <section id="amenities" className="bg-surface-50 py-20 border-y border-surface-200">
+      {/* 3. FACILITIES & SERVICES SECTION */}
+      <section id="facilities" className="bg-surface-50 py-20 border-y border-surface-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="text-center max-w-2xl mx-auto mb-16">
+          <div className="text-center max-w-2xl mx-auto mb-14">
             <Badge variant="brand" size="md">
-              Facility Features
+              Facilities & Services
             </Badge>
-            <h2 className="text-3xl font-bold tracking-tight text-surface-900 mt-3">
-              Everything You Need for a Seamless Match
+            <h2 className="text-3xl font-extrabold tracking-tight text-surface-900 mt-2">
+              Everything Ready for a Great Match
             </h2>
-            <p className="text-sm text-surface-600 mt-2">
-              We provide complete on-site amenities so players can focus entirely on the game.
+            <p className="text-xs sm:text-sm text-surface-600 mt-2">
+              We focus on what genuinely matters: a clean, well-cared-for turf surface, good lighting, and reliable booking.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {BUSINESS_INFO.amenities.map((item, idx) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {BUSINESS_INFO.facilities.map((facility, idx) => (
               <div
                 key={idx}
-                className="bg-white rounded-xl border border-surface-200 p-6 shadow-subtle hover:shadow-card transition-all"
+                className="bg-white rounded-xl border border-surface-200 p-6 shadow-subtle hover:border-surface-300 transition-all space-y-2"
               >
-                <div className="w-10 h-10 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 flex items-center justify-center font-bold text-sm mb-4">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-center font-bold text-xs mb-3">
                   0{idx + 1}
                 </div>
-                <h3 className="text-base font-bold text-surface-900 mb-1.5">
-                  {item.title}
+                <h3 className="text-sm font-bold text-surface-900">
+                  {facility.title}
                 </h3>
                 <p className="text-xs text-surface-600 leading-relaxed">
-                  {item.description}
+                  {facility.description}
                 </p>
               </div>
             ))}
@@ -240,165 +235,271 @@ export const HomePage: React.FC = () => {
       <section id="gallery" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <Badge variant="brand" size="md">
-            Visual Tour
+            Facility Gallery
           </Badge>
-          <h2 className="text-3xl font-bold tracking-tight text-surface-900 mt-3">
-            Arena & Facility Gallery
+          <h2 className="text-3xl font-extrabold tracking-tight text-surface-900 mt-2">
+            The Pitch & Grounds
           </h2>
-          <p className="text-sm text-surface-600 mt-2">
-            Explore our playing field, evening lighting, spectator area, and locker facilities.
+          <p className="text-xs sm:text-sm text-surface-600 mt-2">
+            Tasteful visual previews of our playing turf, floodlighting, and surrounding facilities.
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           
           {/* Card 1 */}
-          <div className="group rounded-2xl border border-surface-200 bg-white overflow-hidden shadow-subtle hover:shadow-card transition-all">
-            <div className="h-48 bg-gradient-to-br from-emerald-900 to-surface-900 flex items-center justify-center text-emerald-300 p-4 text-center">
-              <div>
-                <Award className="w-10 h-10 mx-auto mb-2 opacity-80" />
-                <span className="text-sm font-bold text-white block">Main Pitch A</span>
-                <span className="text-xs text-surface-400">High-Density Artificial Turf</span>
-              </div>
+          <div className="rounded-2xl border border-surface-200 bg-white overflow-hidden shadow-subtle">
+            <div className="h-44 bg-gradient-to-br from-emerald-950 via-emerald-900 to-surface-900 flex flex-col items-center justify-center text-emerald-200 p-4 text-center">
+              <span className="text-xs uppercase font-bold tracking-wider text-emerald-400">Turf Surface</span>
+              <span className="text-base font-bold text-white mt-1">Well-Maintained Artificial Turf</span>
+              <span className="text-[11px] text-surface-400 mt-1">Cushioned and brushed regularly</span>
             </div>
             <div className="p-4">
-              <h4 className="text-sm font-bold text-surface-900">Championship Turf Surface</h4>
-              <p className="text-xs text-surface-500 mt-1">Regularly brushed and sanitized rubber infill for true ball movement.</p>
+              <h4 className="text-xs font-bold text-surface-900">Ground Quality</h4>
+              <p className="text-[11px] text-surface-500 mt-0.5">Comfortable traction for both 5v5 and 6v6 match play.</p>
             </div>
           </div>
 
           {/* Card 2 */}
-          <div className="group rounded-2xl border border-surface-200 bg-white overflow-hidden shadow-subtle hover:shadow-card transition-all">
-            <div className="h-48 bg-gradient-to-br from-slate-900 to-emerald-950 flex items-center justify-center text-amber-300 p-4 text-center">
-              <div>
-                <Zap className="w-10 h-10 mx-auto mb-2 opacity-80" />
-                <span className="text-sm font-bold text-white block">Floodlit Night Matches</span>
-                <span className="text-xs text-surface-400">High-Lux Stadium LED Array</span>
-              </div>
+          <div className="rounded-2xl border border-surface-200 bg-white overflow-hidden shadow-subtle">
+            <div className="h-44 bg-gradient-to-br from-surface-900 via-slate-900 to-emerald-950 flex flex-col items-center justify-center text-amber-200 p-4 text-center">
+              <span className="text-xs uppercase font-bold tracking-wider text-amber-400">Evening Play</span>
+              <span className="text-base font-bold text-white mt-1">LED Floodlighting</span>
+              <span className="text-[11px] text-surface-400 mt-1">Full visibility until 9:00 PM</span>
             </div>
             <div className="p-4">
-              <h4 className="text-sm font-bold text-surface-900">Prime-Time Night Vision</h4>
-              <p className="text-xs text-surface-500 mt-1">Zero blind spots or glare during evening 07:00 PM to 10:00 PM matches.</p>
+              <h4 className="text-xs font-bold text-surface-900">Night Visibility</h4>
+              <p className="text-[11px] text-surface-500 mt-0.5">High-lumen LED lights covering the entire court boundary.</p>
             </div>
           </div>
 
           {/* Card 3 */}
-          <div className="group rounded-2xl border border-surface-200 bg-white overflow-hidden shadow-subtle hover:shadow-card transition-all">
-            <div className="h-48 bg-gradient-to-br from-surface-800 to-surface-950 flex items-center justify-center text-emerald-400 p-4 text-center">
-              <div>
-                <Users className="w-10 h-10 mx-auto mb-2 opacity-80" />
-                <span className="text-sm font-bold text-white block">Locker & Changing Rooms</span>
-                <span className="text-xs text-surface-400">Sanitized Showers & Restrooms</span>
-              </div>
+          <div className="rounded-2xl border border-surface-200 bg-white overflow-hidden shadow-subtle">
+            <div className="h-44 bg-gradient-to-br from-surface-800 to-surface-950 flex flex-col items-center justify-center text-emerald-300 p-4 text-center">
+              <span className="text-xs uppercase font-bold tracking-wider text-emerald-400">Venue Access</span>
+              <span className="text-base font-bold text-white mt-1">Parking & Amenities</span>
+              <span className="text-[11px] text-surface-400 mt-1">Easy vehicular arrival in Hetauda</span>
             </div>
             <div className="p-4">
-              <h4 className="text-sm font-bold text-surface-900">Clean Athlete Amenities</h4>
-              <p className="text-xs text-surface-500 mt-1">Secure personal item lockers and clean post-match shower stalls.</p>
+              <h4 className="text-xs font-bold text-surface-900">Parking on Site</h4>
+              <p className="text-[11px] text-surface-500 mt-0.5">Convenient spot to park your bike or car during game time.</p>
             </div>
           </div>
 
         </div>
       </section>
 
-      {/* 5. LOCATION & CONTACT SECTION */}
+      {/* 5. LOCATION & GOOGLE MAPS SECTION */}
       <section id="location" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-surface-50 rounded-2xl border border-surface-200 p-8 sm:p-12 shadow-card">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div className="bg-surface-50 rounded-2xl border border-surface-200 p-6 sm:p-10 shadow-card">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
-            {/* Left: Venue info */}
-            <div className="space-y-6">
+            {/* Left: Venue address and Get Directions button */}
+            <div className="lg:col-span-5 space-y-6">
               <div>
                 <Badge variant="brand" size="md">
                   Location & Directions
                 </Badge>
-                <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-surface-900 mt-2">
-                  Visit Our Venue in Kathmandu
+                <h3 className="text-2xl font-bold tracking-tight text-surface-900 mt-2">
+                  Visit Maya Sports Centre
                 </h3>
                 <p className="text-xs text-surface-500 mt-1">
-                  * Note: Exact physical address and landmark will be updated upon official business verification.
+                  Located in Hetauda, Bagmati Province. Easily accessible with direct Google Maps guidance.
                 </p>
               </div>
 
-              <div className="space-y-4 text-sm">
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-surface-200">
-                  <MapPin className="w-5 h-5 text-brand-700 shrink-0 mt-0.5" />
+              {/* Exact Address Box */}
+              <div className="p-4 rounded-xl bg-white border border-surface-200 space-y-2">
+                <div className="flex items-start gap-2.5">
+                  <MapPin className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-surface-900 block">Kathmandu Valley, Nepal</span>
-                    <span className="text-xs text-surface-500">Accessible from major ring-road corridors with dedicated parking.</span>
+                    <span className="text-xs uppercase font-bold text-surface-500 block">
+                      Full Physical Address
+                    </span>
+                    <span className="text-sm font-bold text-surface-900 block mt-0.5">
+                      {BUSINESS_INFO.address}
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-surface-200">
-                  <Clock className="w-5 h-5 text-brand-700 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-surface-900 block">Daily Operating Schedule</span>
-                    <span className="text-xs text-surface-500">Open 7 days a week: 06:00 AM – 10:00 PM</span>
-                  </div>
+              {/* Working Get Directions Button */}
+              <div>
+                <a
+                  href={BUSINESS_INFO.mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full"
+                >
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    className="w-full bg-emerald-700 hover:bg-emerald-800 font-bold"
+                    rightIcon={<ExternalLink className="w-4 h-4" />}
+                  >
+                    Get Directions
+                  </Button>
+                </a>
+                <span className="text-[11px] text-surface-500 text-center block mt-1.5">
+                  Opens directly in Google Maps on mobile & desktop
+                </span>
+              </div>
+
+              {/* Hours summary */}
+              <div className="p-4 rounded-xl bg-white border border-surface-200 text-xs space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-surface-900">
+                  <Clock className="w-4 h-4 text-emerald-700" /> Operating Schedule
                 </div>
-
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-white border border-surface-200">
-                  <Phone className="w-5 h-5 text-brand-700 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-surface-900 block">Staff Telephone / WhatsApp</span>
-                    <span className="text-xs text-surface-500">+977-98XXXXXXXX (Placeholder)</span>
-                  </div>
+                <div className="text-surface-600">
+                  10:00 AM – 9:00 PM • Open 7 days a week
                 </div>
               </div>
             </div>
 
-            {/* Right: Quick Inquiry Form */}
-            <div id="contact" className="bg-white rounded-xl border border-surface-200 p-6 shadow-subtle space-y-4">
-              <h4 className="text-base font-bold text-surface-900">
-                Send an Inquiry or Feedback
-              </h4>
-              <p className="text-xs text-surface-500">
-                Interested in hosting a corporate tournament or recurring league? Get in touch with our operations team.
-              </p>
-
-              <form onSubmit={(e) => { e.preventDefault(); alert('Thank you! Your inquiry has been recorded.'); }} className="space-y-3">
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase text-surface-500 mb-1">Your Name</label>
-                  <input type="text" required placeholder="Full Name" className="w-full px-3 py-2 text-xs rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase text-surface-500 mb-1">Contact Phone</label>
-                  <input type="tel" required placeholder="98XXXXXXXX" className="w-full px-3 py-2 text-xs rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase text-surface-500 mb-1">Message</label>
-                  <textarea rows={3} placeholder="Tournament inquiries, recurring weekly slots, etc." className="w-full px-3 py-2 text-xs rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
-                </div>
-                <Button type="submit" variant="primary" size="md" className="w-full">
-                  Submit Inquiry
-                </Button>
-              </form>
+            {/* Right: Interactive Google Map Embed preview */}
+            <div className="lg:col-span-7 rounded-xl overflow-hidden border border-surface-200 bg-white shadow-subtle min-h-[320px] flex flex-col">
+              <iframe
+                title="Maya Sports Centre Google Map"
+                src="https://maps.google.com/maps?q=C2FW%2B8VG%2C%20Rai%20Tole%20Marg%2C%20Hetauda%2C%20Bagmati%20Province%2044107&t=&z=16&ie=UTF8&iwloc=&output=embed"
+                width="100%"
+                height="320"
+                style={{ border: 0 }}
+                allowFullScreen={false}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                className="w-full h-80"
+              />
+              <div className="p-3 bg-surface-50 border-t border-surface-200 flex items-center justify-between text-xs text-surface-600">
+                <span>Rai Tole Marg, Hetauda 44107</span>
+                <a
+                  href={BUSINESS_INFO.mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-emerald-700 hover:underline inline-flex items-center gap-1"
+                >
+                  View Full Map <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             </div>
 
           </div>
         </div>
       </section>
 
-      {/* 6. BOTTOM CALL TO ACTION BANNER */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-brand-900 rounded-3xl p-8 sm:p-14 text-center text-white relative overflow-hidden shadow-floating">
-          <div className="max-w-2xl mx-auto space-y-6 relative z-10">
-            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
-              Ready for Kick-off?
-            </h2>
-            <p className="text-sm sm:text-base text-emerald-200 leading-relaxed">
-              Check live slots for today or upcoming dates. Lock your hour in 30 seconds with zero prepayment.
-            </p>
-            <div className="pt-2">
-              <Link to="/book">
-                <Button
-                  size="lg"
-                  className="bg-white text-surface-900 hover:bg-surface-100 font-bold px-8 shadow-card text-base"
-                  rightIcon={<ArrowRight className="w-4 h-4 text-brand-700" />}
+      {/* 6. CONTACT US SECTION */}
+      <section id="contact" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-2xl border border-surface-200 p-8 sm:p-12 shadow-card">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            
+            {/* Left: Direct Telephone Contact */}
+            <div className="space-y-6">
+              <Badge variant="brand" size="md">
+                Contact Desk
+              </Badge>
+              <h2 className="text-3xl font-extrabold tracking-tight text-surface-900">
+                Call Our Staff Directly
+              </h2>
+              <p className="text-xs sm:text-sm text-surface-600 leading-relaxed">
+                Have questions regarding recurring slots, match scheduling, or directions? Tap below to call our duty staff immediately.
+              </p>
+
+              {/* Clickable Phone Card */}
+              <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                <span className="text-[11px] uppercase font-bold text-emerald-800 tracking-wider block mb-1">
+                  Official Venue Phone
+                </span>
+                <a
+                  href={`tel:${BUSINESS_INFO.phone}`}
+                  className="text-2xl sm:text-3xl font-extrabold text-emerald-950 hover:text-emerald-700 transition-colors inline-flex items-center gap-2"
                 >
-                  Book Your Slot Now
-                </Button>
-              </Link>
+                  <Phone className="w-6 h-6 text-emerald-700" />
+                  <span>{BUSINESS_INFO.phone}</span>
+                </a>
+                <span className="text-[11px] text-emerald-800 block mt-1">
+                  Click to dial directly from your mobile device
+                </span>
+              </div>
             </div>
+
+            {/* Right: Quick Message Form */}
+            <div className="bg-surface-50 rounded-xl border border-surface-200 p-6 space-y-4">
+              <h3 className="text-sm font-bold text-surface-900">
+                Send a Note to Management
+              </h3>
+
+              {inquirySubmitted ? (
+                <div className="p-4 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Thank you! Your inquiry has been received.</span>
+                </div>
+              ) : (
+                <form onSubmit={handleInquirySubmit} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block font-semibold uppercase text-surface-600 mb-1">Your Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Suman Shrestha"
+                      value={inquiryName}
+                      onChange={(e) => setInquiryName(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-surface-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold uppercase text-surface-600 mb-1">Phone Number</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="98XXXXXXXX"
+                      value={inquiryPhone}
+                      onChange={(e) => setInquiryPhone(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-surface-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold uppercase text-surface-600 mb-1">Message</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Question about bookings or timings"
+                      value={inquiryMessage}
+                      onChange={(e) => setInquiryMessage(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-surface-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <Button type="submit" variant="primary" size="md" className="w-full bg-emerald-700 hover:bg-emerald-800 font-bold">
+                    Submit Message
+                  </Button>
+                </form>
+              )}
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* 7. BOTTOM CALL TO ACTION */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-surface-900 rounded-2xl p-8 sm:p-12 text-center text-white space-y-5 border border-surface-800">
+          <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
+            Reserve Your Hour at Maya Sports Centre
+          </h2>
+          <p className="text-xs sm:text-sm text-surface-400 max-w-xl mx-auto leading-relaxed">
+            Check live hourly availability from 10:00 AM to 9:00 PM. Reserve your slot now and pay on arrival at the counter.
+          </p>
+          <div>
+            <Link to="/book">
+              <Button
+                size="lg"
+                variant="primary"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8"
+                rightIcon={<ArrowRight className="w-4 h-4" />}
+              >
+                Book Your Slot
+              </Button>
+            </Link>
           </div>
         </div>
       </section>

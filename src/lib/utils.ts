@@ -14,6 +14,28 @@ export function formatNPR(amount: number): string {
 }
 
 /**
+ * Returns current date and time formatted in Nepal Timezone (Asia/Kathmandu).
+ */
+export function getNepalCurrentDate(): Date {
+  // Compute current time adjusted to UTC+5:45 (Nepal Time)
+  const now = new Date();
+  const utcOffsetMs = now.getTime() + now.getTimezoneOffset() * 60000;
+  const nepalOffsetMs = 5.75 * 3600000;
+  return new Date(utcOffsetMs + nepalOffsetMs);
+}
+
+/**
+ * Get YYYY-MM-DD string for today in Nepal time.
+ */
+export function getNepalTodayFormatted(): string {
+  const nepalDate = getNepalCurrentDate();
+  const year = nepalDate.getFullYear();
+  const month = String(nepalDate.getMonth() + 1).padStart(2, '0');
+  const day = String(nepalDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Check if a date string (YYYY-MM-DD) falls on a Saturday.
  */
 export function isSaturdayDate(dateString: string): boolean {
@@ -24,7 +46,7 @@ export function isSaturdayDate(dateString: string): boolean {
 
 /**
  * Get display time range for a slot.
- * Example: formatSlotTime("07:00", "08:00") => "07:00 AM - 08:00 AM"
+ * Example: formatSlotTime("10:00", "11:00") => "10:00 AM – 11:00 AM"
  */
 export function formatSlotTime(startTime: string, endTime: string): string {
   const formatTime = (timeStr: string) => {
@@ -38,10 +60,29 @@ export function formatSlotTime(startTime: string, endTime: string): string {
 }
 
 /**
+ * Dynamically generate hourly slots between opening and closing hours.
+ * For Maya Sports Centre: 10:00 AM (10) to 9:00 PM (21), yielding 11 slots.
+ */
+export function generateHourlySlotDefinitions(startHour = 10, endHour = 21): Array<{ startTime: string; endTime: string; display: string }> {
+  const slots: Array<{ startTime: string; endTime: string; display: string }> = [];
+  for (let hour = startHour; hour < endHour; hour++) {
+    const startStr = `${hour.toString().padStart(2, '0')}:00`;
+    const endStr = `${(hour + 1).toString().padStart(2, '0')}:00`;
+    slots.push({
+      startTime: startStr,
+      endTime: endStr,
+      display: formatSlotTime(startStr, endStr),
+    });
+  }
+  return slots;
+}
+
+/**
  * Generate a unique random booking verification code.
+ * Example: "MS-8421" (Maya Sports prefix)
  */
 export function generateBookingCode(sport: 'football' | 'cricket' = 'football'): string {
-  const prefix = sport === 'football' ? 'FT' : 'CR';
+  const prefix = sport === 'football' ? 'MS' : 'MC';
   const random = Math.floor(1000 + Math.random() * 9000);
   return `${prefix}-${random}`;
 }

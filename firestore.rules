@@ -15,11 +15,17 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.admin == true ||
+        exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid)) ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
 
-    // Admins registry collection
+    // Authorized Admin Registries
+    match /adminUsers/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     match /admins/{adminId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
@@ -35,15 +41,14 @@ service cloud.firestore {
 
     // Public business settings (pricing, court count, operating hours)
     match /settings/{settingId} {
-      allow read: if true; // Publicly readable for dynamic pricing & schedule
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     // Public court slot availability (locks to prevent double booking)
     // Document ID structure: {sport}_{courtId}_{YYYY-MM-DD}_{HH}
     match /slots/{slotId} {
-      allow read: if true; // Anyone can check whether a slot is free, pending, or booked
-      // Users can reserve an open slot as pending; Admin can fully manage
+      allow read: if true; // Publicly readable for real-time slot colors
       allow create: if isAuthenticated() && (
         isAdmin() ||
         (
@@ -52,7 +57,6 @@ service cloud.firestore {
         )
       );
       allow update: if isAdmin() || (
-        // User can update only their own pending slot before approval/expiration
         resource.data.userId == request.auth.uid &&
         resource.data.status == 'pending'
       );
@@ -61,12 +65,10 @@ service cloud.firestore {
 
     // Booking orders
     match /bookings/{bookingId} {
-      // Customers can only view their own bookings; Admins view all
       allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isAdmin()
       );
 
-      // Authenticated users can submit a pending booking request
       allow create: if isAuthenticated() && (
         isAdmin() ||
         (
@@ -85,6 +87,10 @@ service cloud.firestore {
 
     // Audit logs for administrative actions
     match /audit_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /auditLogs/{logId} {
       allow read, write: if isAdmin();
     }
   }

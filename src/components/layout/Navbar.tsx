@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
+import { AuthModal } from '@/components/common/AuthModal';
+import { Logo } from '@/components/common/Logo';
 import {
   Menu,
   X,
@@ -14,17 +16,18 @@ import {
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { user, isAdmin, loginWithGoogle, logout, updateProfile, devSwitchRole } = useAuth();
+  const { user, isAdmin, logout, updateProfile, needsProfileCompletion, dismissProfileCompletion } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [phoneInput, setPhoneInput] = useState(user?.phoneNumber || '');
-  const [nameInput, setNameInput] = useState(user?.fullName || '');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
   const [profileSaveSuccess, setProfileSaveSuccess] = useState(false);
 
   const navLinks = [
-    { label: 'Home', path: '/' },
-    { label: 'About', path: '/#about' },
-    { label: 'Pitch & Amenities', path: '/#amenities' },
+    { label: 'Home', path: '/#home' },
+    { label: 'About Us', path: '/#about' },
+    { label: 'Facilities', path: '/#facilities' },
     { label: 'Gallery', path: '/#gallery' },
     { label: 'Location', path: '/#location' },
     { label: 'Contact', path: '/#contact' },
@@ -40,12 +43,14 @@ export const Navbar: React.FC = () => {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneInput || phoneInput.length < 8) return;
-    await updateProfile({ fullName: nameInput, phoneNumber: phoneInput });
-    setProfileSaveSuccess(true);
-    setTimeout(() => {
-      setProfileModalOpen(false);
-      setProfileSaveSuccess(false);
-    }, 1200);
+    const res = await updateProfile({ fullName: nameInput, phoneNumber: phoneInput });
+    if (res.success) {
+      setProfileSaveSuccess(true);
+      setTimeout(() => {
+        setProfileModalOpen(false);
+        setProfileSaveSuccess(false);
+      }, 1200);
+    }
   };
 
   return (
@@ -55,20 +60,8 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center justify-between h-16">
             
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="w-10 h-10 rounded-xl bg-brand-700 flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105">
-                <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                </svg>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-extrabold text-lg tracking-tight text-surface-900 leading-tight">
-                  KATHMANDU <span className="text-brand-700">TURF</span>
-                </span>
-                <span className="text-[10px] uppercase font-semibold tracking-wider text-surface-500">
-                  Futsal Arena • Nepal
-                </span>
-              </div>
+            <Link to="/" className="flex items-center">
+              <Logo />
             </Link>
 
             {/* Desktop Navigation */}
@@ -77,7 +70,7 @@ export const Navbar: React.FC = () => {
                 <a
                   key={link.label}
                   href={link.path}
-                  className="text-sm font-medium text-surface-600 hover:text-surface-900 transition-colors"
+                  className="text-xs uppercase font-bold tracking-wider text-surface-600 hover:text-surface-900 transition-colors"
                 >
                   {link.label}
                 </a>
@@ -88,33 +81,38 @@ export const Navbar: React.FC = () => {
             <div className="hidden sm:flex items-center gap-3">
               {/* Primary Book CTA */}
               <Link to="/book">
-                <Button size="sm" variant="primary" leftIcon={<Calendar className="w-4 h-4" />}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="bg-emerald-700 hover:bg-emerald-800 font-bold"
+                  leftIcon={<Calendar className="w-4 h-4" />}
+                >
                   Book Your Slot
                 </Button>
               </Link>
 
-              {/* User / Authentication Dropdown */}
+              {/* User Dropdown or Sign In */}
               {user ? (
                 <div className="flex items-center gap-2 pl-2 border-l border-surface-200">
                   {isAdmin && (
                     <Link to="/admin">
-                      <Button size="sm" variant="secondary" leftIcon={<Shield className="w-3.5 h-3.5 text-brand-700" />}>
+                      <Button size="sm" variant="secondary" leftIcon={<Shield className="w-3.5 h-3.5 text-emerald-700" />}>
                         Admin
                       </Button>
                     </Link>
                   )}
-                  
+
                   <button
                     onClick={handleOpenProfile}
                     className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-surface-200 hover:bg-surface-50 transition-colors text-left"
                     title="View Profile"
                   >
-                    <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-800 flex items-center justify-center font-bold text-xs">
-                      {user.fullName ? user.fullName[0].toUpperCase() : 'P'}
+                    <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+                      {user.fullName ? user.fullName[0].toUpperCase() : 'M'}
                     </div>
                     <div className="hidden lg:block text-xs">
                       <div className="font-semibold text-surface-800 leading-none truncate max-w-[100px]">
-                        {user.fullName.split(' ')[0]}
+                        {user.fullName ? user.fullName.split(' ')[0] : 'Player'}
                       </div>
                       <span className="text-[10px] text-surface-500">
                         {user.phoneNumber ? 'Verified' : 'Add Phone'}
@@ -132,19 +130,14 @@ export const Navbar: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={loginWithGoogle} leftIcon={<User className="w-4 h-4" />}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAuthModalOpen(true)}
+                    leftIcon={<User className="w-4 h-4" />}
+                  >
                     Sign In
                   </Button>
-                  {/* Dev shortcut to preview admin functionality */}
-                  {devSwitchRole && (
-                    <button
-                      onClick={() => devSwitchRole('admin')}
-                      className="text-[10px] font-semibold text-surface-500 hover:text-brand-700 underline px-1"
-                      title="Quick Admin Preview"
-                    >
-                      Staff View
-                    </button>
-                  )}
                 </div>
               )}
             </div>
@@ -152,7 +145,7 @@ export const Navbar: React.FC = () => {
             {/* Mobile Menu Hamburger */}
             <div className="flex sm:hidden items-center gap-2">
               <Link to="/book">
-                <Button size="sm" variant="primary">
+                <Button size="sm" variant="primary" className="bg-emerald-700 hover:bg-emerald-800">
                   Book
                 </Button>
               </Link>
@@ -177,7 +170,7 @@ export const Navbar: React.FC = () => {
                   key={link.label}
                   href={link.path}
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-base font-medium text-surface-700 hover:text-surface-900 py-1"
+                  className="text-sm font-semibold text-surface-700 hover:text-surface-900 py-1"
                 >
                   {link.label}
                 </a>
@@ -185,17 +178,17 @@ export const Navbar: React.FC = () => {
               <Link
                 to="/customer/bookings"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-base font-medium text-brand-700 py-1"
+                className="text-sm font-semibold text-emerald-700 py-1"
               >
-                My Bookings
+                My Bookings & Codes
               </Link>
               {isAdmin && (
                 <Link
                   to="/admin"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-base font-semibold text-surface-900 py-1 flex items-center gap-2"
+                  className="text-sm font-semibold text-surface-900 py-1 flex items-center gap-2"
                 >
-                  <Shield className="w-4 h-4 text-brand-700" /> Admin Command Center
+                  <Shield className="w-4 h-4 text-emerald-700" /> Admin Command Center
                 </Link>
               )}
             </nav>
@@ -212,8 +205,16 @@ export const Navbar: React.FC = () => {
                   </Button>
                 </div>
               ) : (
-                <Button size="md" variant="outline" className="w-full" onClick={loginWithGoogle}>
-                  Sign In with Google
+                <Button
+                  size="md"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setAuthModalOpen(true);
+                  }}
+                >
+                  Sign In / Register
                 </Button>
               )}
             </div>
@@ -221,12 +222,21 @@ export const Navbar: React.FC = () => {
         )}
       </header>
 
-      {/* Customer Profile Completion Modal */}
+      {/* Auth Modal (Google & Email/Password) */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+      />
+
+      {/* Profile Modal (Required for phone verification) */}
       <Modal
-        isOpen={profileModalOpen}
-        onClose={() => setProfileModalOpen(false)}
-        title="Customer Profile"
-        description="Your verified phone number is required so our venue managers can confirm your booking requests."
+        isOpen={profileModalOpen || needsProfileCompletion}
+        onClose={() => {
+          setProfileModalOpen(false);
+          dismissProfileCompletion();
+        }}
+        title="Complete Player Profile"
+        description="A verified mobile phone number is required so our venue managers can confirm Pay on Arrival reservations."
       >
         <form onSubmit={handleSaveProfile} className="space-y-4">
           <div>
@@ -236,9 +246,9 @@ export const Navbar: React.FC = () => {
             <input
               type="text"
               required
-              value={nameInput}
+              value={nameInput || user?.fullName || ''}
               onChange={(e) => setNameInput(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-surface-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-surface-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               placeholder="e.g. Suman Shrestha"
             />
           </div>
@@ -248,24 +258,24 @@ export const Navbar: React.FC = () => {
               Contact Mobile Number
             </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-2.5 text-sm text-surface-400 font-medium">+977</span>
+              <span className="absolute left-3.5 top-2.5 text-sm text-surface-400 font-bold">+977</span>
               <input
                 type="tel"
                 required
-                value={phoneInput.replace('+977', '').trim()}
+                value={phoneInput || user?.phoneNumber || ''}
                 onChange={(e) => setPhoneInput(e.target.value)}
-                className="w-full pl-16 pr-3.5 py-2.5 rounded-lg border border-surface-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full pl-16 pr-3.5 py-2.5 rounded-lg border border-surface-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="98XXXXXXXX"
               />
             </div>
             <p className="text-[11px] text-surface-500 mt-1">
-              Our staff calls this number to approve Pay on Arrival requests.
+              Our staff calls this number to verify your booking request.
             </p>
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase text-surface-600 mb-1">
-              Connected Email
+              Account Email
             </label>
             <input
               type="email"
@@ -276,18 +286,18 @@ export const Navbar: React.FC = () => {
           </div>
 
           {profileSaveSuccess && (
-            <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg">
+            <div className="flex items-center gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg">
               <CheckCircle className="w-4 h-4 text-emerald-600" /> Profile saved successfully!
             </div>
           )}
 
           <div className="flex items-center justify-between pt-2">
             <Link to="/customer/bookings" onClick={() => setProfileModalOpen(false)}>
-              <span className="text-xs font-semibold text-brand-700 hover:underline">
-                View My Bookings & Codes →
+              <span className="text-xs font-semibold text-emerald-700 hover:underline">
+                View My Bookings & Slips →
               </span>
             </Link>
-            <Button type="submit" variant="primary" size="md">
+            <Button type="submit" variant="primary" size="md" className="bg-emerald-700 hover:bg-emerald-800">
               Save Profile
             </Button>
           </div>

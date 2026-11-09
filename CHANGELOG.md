@@ -1,36 +1,28 @@
-# Project Changelog & Architectural Decisions
+# Project Changelog & Architectural Decisions — Maya Sports Centre
 
-All notable changes, milestones, and architectural decisions for this project are documented in this file.
+## [Version 0.2.0 — Maya Sports Centre Redesign & Audit Repair] — 2026-11-09
 
----
+### Rebranding & Ground Truth Alignment
+- **Rebranded Venue:** Completely re-aligned all public pages and documentation to **Maya Sports Centre** (Hetauda, Bagmati Province, Nepal).
+- **Positioning:** Grounded naturally as **Hetauda's No. 1 Sports Centre**.
+- **Marketing Copy Audit:** Removed all unsubstantiated claims ("FIFA-grade", "38x18m stadium dimensions"). Highlighted approved facilities only: quality playing grounds, well-maintained turf, evening LED floodlighting, parking, affordable pricing, open 7 days a week.
+- **Location Integration:** Added physical address (`C2FW+8VG, Rai Tole Marg, Hetauda`) with working Google Maps iframe and "Get Directions" button linking to Google Maps.
+- **Contact Desk:** Wired telephone `9714577877` as a clickable direct mobile link.
 
-## [Phase 0 Foundation] — 2026-11-09
+### Operating Schedule & Booking Engine Repair
+- **Hours & Slots:** Updated from 06:00-22:00 to **10:00 AM – 9:00 PM** (11 one-hour slots dynamically generated from start/end times).
+- **Booking Window:** Enforced strict 7-day rolling window starting from today in Nepal local time (`Asia/Kathmandu`).
+- **Color Coding:** Standardized slot colors: White (Available), Red (Booked), Green (Customer Confirmed), Amber (Under Review).
 
-### Added
-- **Project Scaffolding:** Initialized React 18, Vite 5, TypeScript 5, Tailwind CSS 3 project inside `futsal-booking-platform`.
-- **Git Repository:** Local Git repository initialized with `main` branch.
-- **Environment Tooling:** Installed Node.js LTS (v26.13.0) and GitHub CLI (v2.103.3).
-- **Design Tokens:** Configured Tailwind theme with clean white surfaces (`#FFFFFF`), neutral slate borders, and athletic emerald brand accents (`brand-700`: `#15803D`).
-- **Permanent Documentation Suite:** Authored full initial documentation:
-  1. `PROJECT.md`
-  2. `DEVELOPMENT_PLAN.md`
-  3. `CURRENT_STATUS.md`
-  4. `DESIGN_SYSTEM.md`
-  5. `ARCHITECTURE.md`
-  6. `DATABASE_SCHEMA.md`
-  7. `BOOKING_LOGIC.md`
-  8. `ADMIN_GUIDE.md`
-  9. `CHANGELOG.md`
-  10. `README.md`
-- **Firebase Scaffolding:**
-  - `firestore.rules`: Declarative security rules protecting private customer data and preventing unauthorized price/status edits.
-  - `firestore.indexes.json`: Compound query indexes for customer bookings and slot dates.
-  - `firebase.json`: Descriptor for Firestore and Cloud Functions emulators and deployments.
-  - `functions/`: Serverless functions for unique booking code generation and automated pending reservation timeout cleanup.
-- **Vercel Compatibility:** Authored `vercel.json` for SPA rewrites.
+### Authentication Expansion
+- **Two Real Registration Methods:**
+  1. Continue with Google (Firebase OAuth popup + first-time phone capture).
+  2. Email & Password registration (Full Name, Phone Number, Email, Password, Confirm Password) and login.
+- **Unified AuthModal:** Centralized modal seamlessly integrated across navbar, booking confirmation, and booking history.
 
-### Architectural Decisions
-- **Decision 1 — Hosting Separation:** Frontend hosted on Vercel for fast global edge distribution; Firebase utilized for serverless Auth, Firestore, and Cloud Functions.
-- **Decision 2 — Atomic Slot Keys:** Defined deterministic slot key format `{sport}_{courtId}_{YYYY-MM-DD}_{HH}` to guarantee single-source locking and mathematically eliminate double-booking race conditions.
-- **Decision 3 — Snapshot Pricing on Orders:** Pricing is dynamically read from settings (Normal Day: NPR 1,300; Saturday: NPR 1,500) but saved as a fixed snapshot on each booking document to ensure financial historical accuracy.
-- **Decision 4 — Deferred Payment Gateway:** eSewa/Khalti online payment integrations are isolated and deferred until merchant authorization is obtained; Pay on Arrival is activated as the launch payment method.
+### Admin Security Repair
+- **Separated Admin Gateway:** Dedicated `/admin` barrier requiring staff Firebase authentication verified against `/adminUsers` in Firestore. Removed dev role switching from client UI.
+
+### Live Firebase Connection
+- **Project Credentials:** Bound real Firebase project `futsal-2f004` via `.env.local` with `.env.example` guidance.
+- **Security Rules:** Updated `firestore.rules` for `/adminUsers`, atomic slot locks, and role protection.

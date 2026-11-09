@@ -6,8 +6,13 @@ import {
   RevenueMetrics,
   SportType,
 } from '@/types';
-import { DEFAULT_PRICING } from '@/lib/constants';
-import { isSaturdayDate, generateBookingCode } from '@/lib/utils';
+import { DEFAULT_PRICING, BUSINESS_INFO } from '@/lib/constants';
+import {
+  isSaturdayDate,
+  generateBookingCode,
+  generateHourlySlotDefinitions,
+  getNepalTodayFormatted,
+} from '@/lib/utils';
 import { useAuth } from './AuthContext';
 import { db, isFirebaseConfigured } from '@/lib/firebase';
 import {
@@ -31,7 +36,10 @@ interface BookingContextType {
   userOrders: BookingOrder[];
   revenueMetrics: RevenueMetrics;
   isLoading: boolean;
-  requestSlotBooking: (slot: CourtSlot, customerNote?: string) => Promise<{ success: boolean; error?: string; order?: BookingOrder }>;
+  requestSlotBooking: (
+    slot: CourtSlot,
+    customerNote?: string
+  ) => Promise<{ success: boolean; error?: string; order?: BookingOrder }>;
   adminApproveBooking: (orderId: string) => Promise<{ success: boolean; error?: string }>;
   adminRejectBooking: (orderId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
   adminCreateManualBooking: (params: {
@@ -46,136 +54,93 @@ interface BookingContextType {
 
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
 
-const BOOKINGS_STORAGE_KEY = 'futsal_local_booking_orders';
-
-// Initial seed orders for demonstration if local storage is empty
-const getInitialSeedOrders = (): BookingOrder[] => {
-  const today = new Date().toISOString().split('T')[0];
-  return [
-    {
-      id: 'ord-seed-1',
-      bookingCode: 'FT-7821',
-      sport: 'football',
-      courtId: 'court1',
-      courtName: 'Main Futsal Pitch (Pitch A)',
-      date: today,
-      startTime: '17:00',
-      endTime: '18:00',
-      durationMinutes: 60,
-      slotId: `football_court1_${today}_17`,
-      ratePerHour: isSaturdayDate(today) ? 1500 : 1300,
-      totalAmount: isSaturdayDate(today) ? 1500 : 1300,
-      currency: 'NPR',
-      isSaturday: isSaturdayDate(today),
-      paymentMethod: 'pay_on_arrival',
-      paymentStatus: 'pending',
-      userId: 'demo-customer-123',
-      customerName: 'Aayush Shrestha',
-      customerPhone: '9841234567',
-      isManualBooking: false,
-      status: 'confirmed',
-      createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-      confirmedAt: new Date(Date.now() - 3600000).toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'ord-seed-2',
-      sport: 'football',
-      courtId: 'court1',
-      courtName: 'Main Futsal Pitch (Pitch A)',
-      date: today,
-      startTime: '19:00',
-      endTime: '20:00',
-      durationMinutes: 60,
-      slotId: `football_court1_${today}_19`,
-      ratePerHour: isSaturdayDate(today) ? 1500 : 1300,
-      totalAmount: isSaturdayDate(today) ? 1500 : 1300,
-      currency: 'NPR',
-      isSaturday: isSaturdayDate(today),
-      paymentMethod: 'pay_on_arrival',
-      paymentStatus: 'pending',
-      userId: 'customer-prakash-456',
-      customerName: 'Prakash Thapa',
-      customerPhone: '9801234567',
-      isManualBooking: false,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
-};
+const BOOKINGS_STORAGE_KEY = 'maya_local_booking_orders';
 
 export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [selectedSport, setSelectedSport] = useState<SportType>('football');
-  
-  // Format today as YYYY-MM-DD in local time
-  const todayFormatted = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }, []);
 
-  const [selectedDate, setSelectedDate] = useState<string>(todayFormatted);
+  // Nepal local date today
+  const nepalToday = useMemo(() => getNepalTodayFormatted(), []);
+  const [selectedDate, setSelectedDate] = useState<string>(nepalToday);
   const [pricing] = useState<PricingConfig>(DEFAULT_PRICING);
+
   const [orders, setOrders] = useState<BookingOrder[]>(() => {
     const saved = localStorage.getItem(BOOKINGS_STORAGE_KEY);
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch {
-        return getInitialSeedOrders();
+        return [];
       }
     }
-    return getInitialSeedOrders();
+    return [];
   });
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Sync to local storage whenever orders update
+  // Sync to local storage
   useEffect(() => {
     localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(orders));
   }, [orders]);
 
-  // Firestore synchronization if configured
+  // Firestore live listener on bookings collection
   useEffect(() => {
     if (isFirebaseConfigured && db) {
       setIsLoading(true);
       const q = query(collection(db, 'bookings'));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const fetched: BookingOrder[] = [];
-        snapshot.forEach((docSnap) => {
-          fetched.push({ id: docSnap.id, ...docSnap.data() } as BookingOrder);
-        });
-        setOrders(fetched);
-        setIsLoading(false);
-      }, (err) => {
-        console.error('Firestore bookings listener error:', err);
-        setIsLoading(false);
-      });
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const fetched: BookingOrder[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            fetched.push({
+              id: docSnap.id,
+              ...data,
+            } as BookingOrder);
+          });
+          setOrders(fetched);
+          setIsLoading(false);
+        },
+        (err) => {
+          console.error('Firestore bookings listener error:', err);
+          setIsLoading(false);
+        }
+      );
 
       return () => unsubscribe();
     }
   }, []);
 
-  // Generate slots for the selected date
+  // Generate the 11 hourly slots dynamically (10:00 AM to 09:00 PM)
+  const slotDefinitions = useMemo(() => {
+    return generateHourlySlotDefinitions(
+      pricing.operatingHours.start,
+      pricing.operatingHours.end
+    );
+  }, [pricing.operatingHours.start, pricing.operatingHours.end]);
+
+  // Compute live slot availability for selected date
   const slots = useMemo((): CourtSlot[] => {
     const isSat = isSaturdayDate(selectedDate);
     const price = isSat ? pricing.saturdayRate : pricing.normalDayRate;
     const generated: CourtSlot[] = [];
 
+    // Filter active bookings on the selected date & sport
     const activeOrdersOnDate = orders.filter(
-      (o) => o.date === selectedDate && o.sport === selectedSport && o.status !== 'rejected' && o.status !== 'expired' && o.status !== 'cancelled'
+      (o) =>
+        o.date === selectedDate &&
+        o.sport === selectedSport &&
+        o.status !== 'rejected' &&
+        o.status !== 'expired' &&
+        o.status !== 'cancelled'
     );
 
-    for (let hour = pricing.operatingHours.start; hour < pricing.operatingHours.end; hour++) {
-      const startStr = `${hour.toString().padStart(2, '0')}:00`;
-      const endStr = `${(hour + 1).toString().padStart(2, '0')}:00`;
-      const slotKey = `${selectedSport}_court1_${selectedDate}_${hour.toString().padStart(2, '0')}`;
-
-      // Check if slot has a confirmed or pending booking
-      const match = activeOrdersOnDate.find((o) => o.startTime === startStr);
+    for (const def of slotDefinitions) {
+      const hourPart = def.startTime.split(':')[0];
+      const slotKey = `${selectedSport}_court1_${selectedDate}_${hourPart}`;
+      const match = activeOrdersOnDate.find((o) => o.startTime === def.startTime);
 
       if (match) {
         generated.push({
@@ -183,8 +148,8 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           sport: selectedSport,
           courtId: 'court1',
           date: selectedDate,
-          startTime: startStr,
-          endTime: endStr,
+          startTime: def.startTime,
+          endTime: def.endTime,
           status: match.status === 'confirmed' ? 'confirmed' : 'pending',
           price: match.totalAmount,
           bookingId: match.id,
@@ -200,8 +165,8 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           sport: selectedSport,
           courtId: 'court1',
           date: selectedDate,
-          startTime: startStr,
-          endTime: endStr,
+          startTime: def.startTime,
+          endTime: def.endTime,
           status: 'available',
           price,
           isSaturday: isSat,
@@ -210,9 +175,9 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     return generated;
-  }, [selectedDate, selectedSport, orders, pricing]);
+  }, [selectedDate, selectedSport, orders, pricing, slotDefinitions]);
 
-  // Request a slot booking (Customer Pay on Arrival workflow)
+  // Request a slot booking (Pay on Arrival workflow with Firestore Transaction)
   const requestSlotBooking = useCallback(
     async (
       slot: CourtSlot,
@@ -224,11 +189,11 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!user.phoneNumber || user.phoneNumber.trim().length < 8) {
         return {
           success: false,
-          error: 'Please complete your phone number in your profile so we can confirm your reservation.',
+          error: 'Please enter a valid phone number so our venue staff can confirm your booking.',
         };
       }
 
-      // Check for slot collision
+      // Check for slot collision locally
       const existing = orders.find(
         (o) =>
           o.date === slot.date &&
@@ -253,7 +218,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         id: `ord-${Date.now()}`,
         sport: slot.sport,
         courtId: slot.courtId || 'court1',
-        courtName: 'Main Futsal Pitch (Pitch A)',
+        courtName: `${BUSINESS_INFO.name} Ground`,
         date: slot.date,
         startTime: slot.startTime,
         endTime: slot.endTime,
@@ -282,23 +247,43 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           await runTransaction(firestore, async (tx) => {
             const slotRef = doc(firestore, 'slots', slot.slotId);
             const slotSnap = await tx.get(slotRef);
+
+            // Double booking prevention check
             if (slotSnap.exists()) {
-              throw new Error('This slot has just been claimed by another player.');
+              const currentSlotData = slotSnap.data();
+              if (currentSlotData.status === 'confirmed' || currentSlotData.status === 'pending') {
+                throw new Error('This slot was just claimed by another player. Please pick another time.');
+              }
             }
+
+            // Lock slot atomically
             tx.set(slotRef, {
+              slotId: slot.slotId,
               status: 'pending',
               userId: user.uid,
               customerName: user.fullName,
               customerPhone: user.phoneNumber,
               date: slot.date,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
               sport: slot.sport,
               lockedAt: serverTimestamp(),
             });
+
+            // Record booking document
             const orderRef = doc(collection(firestore, 'bookings'));
-            tx.set(orderRef, newOrder);
+            newOrder.id = orderRef.id;
+            tx.set(orderRef, {
+              ...newOrder,
+              createdAtServer: serverTimestamp(),
+              updatedAtServer: serverTimestamp(),
+            });
           });
         } catch (err: any) {
-          return { success: false, error: err.message || 'Booking transaction failed.' };
+          return {
+            success: false,
+            error: err.message || 'Slot reservation failed. Please refresh availability.',
+          };
         }
       } else {
         setOrders((prev) => [newOrder, ...prev]);
@@ -314,22 +299,34 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     async (orderId: string): Promise<{ success: boolean; error?: string }> => {
       const code = generateBookingCode(selectedSport);
       const firestore = db;
+
       if (isFirebaseConfigured && firestore) {
         try {
           const orderRef = doc(firestore, 'bookings', orderId);
           await runTransaction(firestore, async (tx) => {
             const snap = await tx.get(orderRef);
-            if (!snap.exists()) throw new Error('Order not found.');
+            if (!snap.exists()) throw new Error('Order record not found.');
             const data = snap.data() as BookingOrder;
+
             tx.update(orderRef, {
               status: 'confirmed',
               bookingCode: code,
               confirmedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
+              updatedAtServer: serverTimestamp(),
             });
+
             if (data.slotId) {
               const slotRef = doc(firestore, 'slots', data.slotId);
-              tx.set(slotRef, { status: 'confirmed', bookingCode: code }, { merge: true });
+              tx.set(
+                slotRef,
+                {
+                  status: 'confirmed',
+                  bookingCode: code,
+                  confirmedAt: serverTimestamp(),
+                },
+                { merge: true }
+              );
             }
           });
         } catch (err: any) {
@@ -355,10 +352,11 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [selectedSport]
   );
 
-  // Admin rejects a pending booking
+  // Admin rejects a pending booking (immediately releasing the slot)
   const adminRejectBooking = useCallback(
     async (orderId: string, reason?: string): Promise<{ success: boolean; error?: string }> => {
       const firestore = db;
+
       if (isFirebaseConfigured && firestore) {
         try {
           const orderRef = doc(firestore, 'bookings', orderId);
@@ -366,15 +364,18 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const snap = await tx.get(orderRef);
             if (!snap.exists()) throw new Error('Order not found.');
             const data = snap.data() as BookingOrder;
+
             tx.update(orderRef, {
               status: 'rejected',
               rejectionReason: reason || 'Declined by venue manager',
               rejectedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
+              updatedAtServer: serverTimestamp(),
             });
+
             if (data.slotId) {
               const slotRef = doc(firestore, 'slots', data.slotId);
-              tx.delete(slotRef);
+              tx.delete(slotRef); // Deleting the slot lock makes it immediately available!
             }
           });
         } catch (err: any) {
@@ -400,7 +401,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     []
   );
 
-  // Admin creates an offline/manual walk-in booking
+  // Admin creates an offline/walk-in booking
   const adminCreateManualBooking = useCallback(
     async (params: {
       date: string;
@@ -413,15 +414,15 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const isSat = isSaturdayDate(params.date);
       const totalAmount = isSat ? pricing.saturdayRate : pricing.normalDayRate;
       const code = generateBookingCode('football');
-      const slotHour = params.startTime.split(':')[0];
-      const slotId = `football_court1_${params.date}_${slotHour}`;
+      const hourPart = params.startTime.split(':')[0];
+      const slotId = `football_court1_${params.date}_${hourPart}`;
 
       const manualOrder: BookingOrder = {
         id: `manual-ord-${Date.now()}`,
         bookingCode: code,
         sport: 'football',
         courtId: 'court1',
-        courtName: 'Main Futsal Pitch (Pitch A)',
+        courtName: `${BUSINESS_INFO.name} Ground`,
         date: params.date,
         startTime: params.startTime,
         endTime: params.endTime,
@@ -432,7 +433,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         currency: 'NPR',
         isSaturday: isSat,
         paymentMethod: 'pay_on_arrival',
-        paymentStatus: 'received', // Counter bookings usually collected in cash/Fonepay
+        paymentStatus: 'received',
         userId: 'admin_counter',
         customerName: params.customerName,
         customerPhone: params.customerPhone,
@@ -448,20 +449,34 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (isFirebaseConfigured && firestore) {
         try {
           const orderRef = doc(collection(firestore, 'bookings'));
+          manualOrder.id = orderRef.id;
           const slotRef = doc(firestore, 'slots', slotId);
+
           await runTransaction(firestore, async (tx) => {
             const slotSnap = await tx.get(slotRef);
-            if (slotSnap.exists()) throw new Error('Slot is already occupied.');
+            if (slotSnap.exists()) {
+              const d = slotSnap.data();
+              if (d.status === 'confirmed' || d.status === 'pending') {
+                throw new Error('This slot is already reserved.');
+              }
+            }
             tx.set(slotRef, {
+              slotId,
               status: 'confirmed',
               bookingCode: code,
               customerName: params.customerName,
               customerPhone: params.customerPhone,
               date: params.date,
+              startTime: params.startTime,
+              endTime: params.endTime,
               sport: 'football',
               lockedAt: serverTimestamp(),
             });
-            tx.set(orderRef, manualOrder);
+            tx.set(orderRef, {
+              ...manualOrder,
+              createdAtServer: serverTimestamp(),
+              updatedAtServer: serverTimestamp(),
+            });
           });
         } catch (err: any) {
           return { success: false, error: err.message };
@@ -475,20 +490,17 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [pricing]
   );
 
-  // Revenue metrics: strictly calculates confirmed bookings
+  // Revenue metrics strictly computed from confirmed orders
   const revenueMetrics = useMemo((): RevenueMetrics => {
-    const today = new Date().toISOString().split('T')[0];
+    const todayStr = getNepalTodayFormatted();
     const now = new Date();
 
-    // Calculate start of current week (Monday)
-    const currentDay = now.getDay(); // 0 is Sunday
+    const currentDay = now.getDay();
     const diffToMonday = (currentDay === 0 ? -6 : 1) - currentDay;
     const monday = new Date(now);
     monday.setDate(now.getDate() + diffToMonday);
     const weekStartStr = monday.toISOString().split('T')[0];
-
-    // Current month prefix: YYYY-MM
-    const currentMonthPrefix = today.substring(0, 7);
+    const currentMonthPrefix = todayStr.substring(0, 7);
 
     let todayRev = 0;
     let weekRev = 0;
@@ -510,15 +522,15 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (o.status === 'pending') pendingCount++;
       if (o.status === 'rejected') rejectedCount++;
 
-      // Financials: STRICTLY CONFIRMED
+      // Strict revenue rule: ONLY CONFIRMED
       if (o.status === 'confirmed') {
         confirmedCount++;
         allTimeRev += o.totalAmount;
 
-        if (o.date === today) {
+        if (o.date === todayStr) {
           todayRev += o.totalAmount;
         }
-        if (o.date >= weekStartStr && o.date <= today) {
+        if (o.date >= weekStartStr && o.date <= todayStr) {
           weekRev += o.totalAmount;
         }
         if (o.date.startsWith(currentMonthPrefix)) {

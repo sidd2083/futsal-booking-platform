@@ -10,15 +10,18 @@ export type PaymentStatus = 'pending' | 'received' | 'refunded';
 
 export type UserRole = 'customer' | 'admin';
 
+export type AuthProviderType = 'google' | 'password';
+
 export interface UserProfile {
   uid: string;
   fullName: string;
   email: string;
   phoneNumber: string;
+  authProvider: AuthProviderType;
   photoURL?: string;
   role: UserRole;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CourtSlot {
@@ -74,9 +77,9 @@ export interface PricingConfig {
   normalDayRate: number; // 1300
   saturdayRate: number; // 1500
   operatingHours: {
-    start: number; // 6 (06:00)
-    end: number; // 22 (22:00)
-    slotDurationMinutes: number;
+    start: number; // 10 (10:00 AM)
+    end: number; // 21 (09:00 PM)
+    slotDurationMinutes: number; // 60
   };
 }
 

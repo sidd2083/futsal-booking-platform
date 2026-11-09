@@ -34,8 +34,8 @@ if (isFirebaseConfigured) {
     console.error('Firebase initialization error:', error);
   }
 } else {
-  console.info(
-    '[Firebase Scaffolding] Running with local operational store. Set VITE_FIREBASE_* in .env.local to connect your live Firebase project.'
+  console.warn(
+    '[Firebase Scaffolding] VITE_FIREBASE_* environment variables are missing or default.'
   );
 }
 
