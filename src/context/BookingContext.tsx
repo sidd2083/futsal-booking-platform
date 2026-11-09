@@ -5,6 +5,7 @@ import {
   PricingConfig,
   RevenueMetrics,
   SportType,
+  PaymentMethod,
 } from '@/types';
 import { DEFAULT_PRICING, BUSINESS_INFO } from '@/lib/constants';
 import {
@@ -38,7 +39,8 @@ interface BookingContextType {
   isLoading: boolean;
   requestSlotBooking: (
     slot: CourtSlot,
-    customerNote?: string
+    customerNote?: string,
+    paymentMethod?: PaymentMethod
   ) => Promise<{ success: boolean; error?: string; order?: BookingOrder }>;
   adminApproveBooking: (orderId: string) => Promise<{ success: boolean; error?: string }>;
   adminRejectBooking: (orderId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
@@ -177,11 +179,12 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return generated;
   }, [selectedDate, selectedSport, orders, pricing, slotDefinitions]);
 
-  // Request a slot booking (Pay on Arrival workflow with Firestore Transaction)
+  // Request a slot booking (Pay on Arrival or Pay Online workflow with Firestore Transaction)
   const requestSlotBooking = useCallback(
     async (
       slot: CourtSlot,
-      customerNote?: string
+      customerNote?: string,
+      paymentMethod: PaymentMethod = 'pay_on_arrival'
     ): Promise<{ success: boolean; error?: string; order?: BookingOrder }> => {
       if (!user) {
         return { success: false, error: 'Please sign in to complete your booking.' };
@@ -228,7 +231,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         totalAmount,
         currency: 'NPR',
         isSaturday: isSat,
-        paymentMethod: 'pay_on_arrival',
+        paymentMethod: paymentMethod || 'pay_on_arrival',
         paymentStatus: 'pending',
         userId: user.uid,
         customerName: user.fullName || 'Customer',

@@ -153,6 +153,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [syncUserProfile]);
 
+  // Helper to translate Firebase errors into clear, actionable advice
+  const formatAuthError = (err: any): string => {
+    if (!err) return 'Authentication failed. Please try again.';
+    const code = err.code || '';
+    const msg = err.message || '';
+
+    if (code === 'auth/operation-not-allowed') {
+      return 'Authentication provider is not yet enabled in your Firebase Console. Go to Firebase Console -> Authentication -> Sign-in method, and toggle Enable for both "Email/Password" and "Google".';
+    }
+    if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+      return 'Invalid credentials. If you have not created an account yet, please click "Register New Account" to sign up first.';
+    }
+    if (code === 'auth/email-already-in-use') {
+      return 'This email is already registered. Please switch to the "Sign In" tab and enter your password.';
+    }
+    if (code === 'auth/weak-password') {
+      return 'Password is too weak. Please use at least 6 characters.';
+    }
+    if (code === 'auth/invalid-email') {
+      return 'Please enter a valid email address.';
+    }
+    if (code === 'auth/popup-closed-by-user') {
+      return 'Google sign-in was closed before completion. Please click "Continue with Google" again.';
+    }
+    if (code === 'auth/popup-blocked') {
+      return 'Browser blocked the Google sign-in window. Please allow popups for this site and try again.';
+    }
+    if (code === 'auth/unauthorized-domain') {
+      return 'Domain not authorized. Please add "localhost" under Firebase Console -> Authentication -> Settings -> Authorized Domains.';
+    }
+    if (code === 'auth/network-request-failed') {
+      return 'Network connection error. Please verify your internet connection.';
+    }
+    if (code === 'auth/too-many-requests') {
+      return 'Too many attempts. Access is temporarily suspended. Please wait a minute or reset your password.';
+    }
+
+    return msg || 'Authentication error. Please check your credentials or Firebase console settings.';
+  };
+
   // Google OAuth flow
   const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
     if (!isFirebaseConfigured || !auth || !googleProvider) {
@@ -164,15 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await syncUserProfile(result.user, 'google');
       return { success: true };
     } catch (err: any) {
-      let message = 'Google sign-in was cancelled or failed.';
-      if (err.code === 'auth/popup-closed-by-user') {
-        message = 'Google sign-in popup was closed before completion.';
-      } else if (err.code === 'auth/network-request-failed') {
-        message = 'Network error. Please check your internet connection.';
-      } else if (err.message) {
-        message = err.message;
-      }
-      return { success: false, error: message };
+      return { success: false, error: formatAuthError(err) };
     }
   };
 
@@ -231,17 +263,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(profile));
       return { success: true };
     } catch (err: any) {
-      let message = 'Failed to register account.';
-      if (err.code === 'auth/email-already-in-use') {
-        message = 'An account with this email already exists. Please sign in instead.';
-      } else if (err.code === 'auth/weak-password') {
-        message = 'Password is too weak. Please choose a stronger password.';
-      } else if (err.code === 'auth/invalid-email') {
-        message = 'Invalid email address format.';
-      } else if (err.message) {
-        message = err.message;
-      }
-      return { success: false, error: message };
+      return { success: false, error: formatAuthError(err) };
     }
   };
 
@@ -263,15 +285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await syncUserProfile(cred.user, 'password');
       return { success: true };
     } catch (err: any) {
-      let message = 'Invalid email or password.';
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        message = 'Incorrect email or password. Please try again.';
-      } else if (err.code === 'auth/too-many-requests') {
-        message = 'Too many failed login attempts. Please reset your password or try again later.';
-      } else if (err.message) {
-        message = err.message;
-      }
-      return { success: false, error: message };
+      return { success: false, error: formatAuthError(err) };
     }
   };
 

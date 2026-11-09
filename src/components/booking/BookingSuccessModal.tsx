@@ -76,7 +76,9 @@ export const BookingSuccessModal: React.FC<BookingSuccessModalProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-surface-500">Payment:</span>
-              <span className="font-semibold text-surface-800">Pay on Arrival at Counter</span>
+              <span className="font-semibold text-surface-800">
+                {order.paymentMethod === 'pay_online' ? 'Online Transfer (eSewa / Khalti)' : 'Pay on Arrival at Counter'}
+              </span>
             </div>
           </div>
         </div>

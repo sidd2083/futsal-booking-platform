@@ -4,7 +4,7 @@ export type SlotStatus = 'available' | 'pending' | 'confirmed' | 'disabled';
 
 export type BookingStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled' | 'expired';
 
-export type PaymentMethod = 'pay_on_arrival' | 'esewa' | 'khalti';
+export type PaymentMethod = 'pay_on_arrival' | 'pay_online' | 'esewa' | 'khalti';
 
 export type PaymentStatus = 'pending' | 'received' | 'refunded';
 

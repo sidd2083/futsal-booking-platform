@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CourtSlot, BookingOrder } from '@/types';
+import { CourtSlot, BookingOrder, PaymentMethod } from '@/types';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { formatNPR, formatSlotTime } from '@/lib/utils';
@@ -11,7 +11,12 @@ import {
   Banknote,
   AlertCircle,
   Phone,
+  Wallet,
+  QrCode,
+  Check,
+  ShieldCheck,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ConfirmationModalProps {
   slot: CourtSlot | null;
@@ -35,6 +40,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   const [phoneInput, setPhoneInput] = useState(user?.phoneNumber || '');
   const [notes, setNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pay_on_arrival');
 
   if (!slot) return null;
 
@@ -64,7 +70,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     }
 
     setIsSubmitting(true);
-    const result = await requestSlotBooking(slot, notes);
+    const result = await requestSlotBooking(slot, notes, paymentMethod);
     setIsSubmitting(false);
 
     if (result.success && result.order) {
@@ -80,11 +86,11 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Confirm Slot Reservation"
-      description={`Are you sure you want to book ${slot.date} at ${formatSlotTime(slot.startTime, slot.endTime)}?`}
+      description={`Review your slot details for ${slot.date} at ${formatSlotTime(slot.startTime, slot.endTime)}.`}
     >
       <div className="space-y-5">
         {/* Order Summary Box */}
-        <div className="bg-surface-50 rounded-xl border border-surface-200 p-4 space-y-3">
+        <div className="bg-surface-50 rounded-2xl border border-surface-200 p-4 space-y-3">
           <div className="flex items-center justify-between text-xs py-1 border-b border-surface-200">
             <span className="text-surface-500 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-surface-400" /> Date
@@ -99,25 +105,99 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               <Clock className="w-3.5 h-3.5 text-surface-400" /> Time Window
             </span>
             <span className="font-bold text-surface-900">
-              {formatSlotTime(slot.startTime, slot.endTime)} (1 Hour)
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between text-xs py-1 border-b border-surface-200">
-            <span className="text-surface-500 flex items-center gap-1.5">
-              <Banknote className="w-3.5 h-3.5 text-surface-400" /> Hourly Rate
-            </span>
-            <span className="text-base font-extrabold text-emerald-800">
-              {formatNPR(slot.price)}
+              {formatSlotTime(slot.startTime, slot.endTime)} (1 Hour Match)
             </span>
           </div>
 
           <div className="flex items-center justify-between text-xs pt-1">
-            <span className="text-surface-500">Payment Method</span>
-            <span className="font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              Pay on Arrival
+            <span className="text-surface-500 flex items-center gap-1.5">
+              <Banknote className="w-3.5 h-3.5 text-surface-400" /> Total Fee
+            </span>
+            <span className="text-lg font-black text-emerald-800">
+              {formatNPR(slot.price)}
             </span>
           </div>
+        </div>
+
+        {/* PAYMENT METHOD SELECTOR: TWO EXPLICIT OPTIONS */}
+        <div className="space-y-2.5">
+          <label className="block text-xs font-bold text-surface-800 uppercase tracking-wider">
+            Choose Payment Option
+          </label>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* OPTION 1: Pay on Arrival */}
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('pay_on_arrival')}
+              className={cn(
+                'relative flex flex-col items-start p-3.5 rounded-xl border-2 text-left transition-all duration-200',
+                paymentMethod === 'pay_on_arrival'
+                  ? 'border-emerald-600 bg-emerald-50/70 shadow-sm ring-2 ring-emerald-500/20'
+                  : 'border-surface-200 bg-white hover:border-surface-300'
+              )}
+            >
+              <div className="flex items-center justify-between w-full mb-1.5">
+                <span className="flex items-center gap-2 text-xs font-black text-surface-900">
+                  <Wallet className={cn('w-4 h-4', paymentMethod === 'pay_on_arrival' ? 'text-emerald-700' : 'text-surface-500')} />
+                  Pay on Arrival
+                </span>
+                {paymentMethod === 'pay_on_arrival' && (
+                  <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center">
+                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-surface-600 leading-snug">
+                Pay in cash or venue QR code at Maya Sports Centre counter before playing.
+              </p>
+              <span className="mt-2 text-[10px] font-bold text-emerald-700 uppercase bg-emerald-100/60 px-2 py-0.5 rounded">
+                Recommended • No Advance Needed
+              </span>
+            </button>
+
+            {/* OPTION 2: Pay Online */}
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('pay_online')}
+              className={cn(
+                'relative flex flex-col items-start p-3.5 rounded-xl border-2 text-left transition-all duration-200',
+                paymentMethod === 'pay_online'
+                  ? 'border-emerald-600 bg-emerald-50/70 shadow-sm ring-2 ring-emerald-500/20'
+                  : 'border-surface-200 bg-white hover:border-surface-300'
+              )}
+            >
+              <div className="flex items-center justify-between w-full mb-1.5">
+                <span className="flex items-center gap-2 text-xs font-black text-surface-900">
+                  <QrCode className={cn('w-4 h-4', paymentMethod === 'pay_online' ? 'text-emerald-700' : 'text-surface-500')} />
+                  Pay Online
+                </span>
+                {paymentMethod === 'pay_online' && (
+                  <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center">
+                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-surface-600 leading-snug">
+                eSewa, Khalti, or Mobile Banking transfer. QR provided after staff review.
+              </p>
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="text-[9px] font-black text-white bg-green-600 px-1.5 py-0.5 rounded">eSewa</span>
+                <span className="text-[9px] font-black text-white bg-purple-600 px-1.5 py-0.5 rounded">Khalti</span>
+                <span className="text-[9px] font-black text-surface-700 bg-surface-200 px-1.5 py-0.5 rounded">Fonepay</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Helper note for chosen option */}
+          {paymentMethod === 'pay_online' && (
+            <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-xl text-xs text-purple-900 flex items-start gap-2">
+              <ShieldCheck className="w-4 h-4 text-purple-700 shrink-0 mt-0.5" />
+              <p className="text-[11px] leading-relaxed">
+                Staff will contact you via WhatsApp or phone with our official venue eSewa/Khalti QR code once your request is reviewed.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* User Identity / Phone Verification */}
@@ -168,7 +248,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Friendly 5v5 match"
+            placeholder="e.g. 5v5 friendly match, need ball"
             className="w-full px-3 py-2 rounded-lg border border-surface-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>

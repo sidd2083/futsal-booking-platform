@@ -14,7 +14,7 @@ export const Footer: React.FC = () => {
           
           {/* Brand Col */}
           <div className="space-y-4">
-            <Logo variant="dark" />
+            <Logo variant="dark" size="lg" />
             <p className="text-xs text-surface-400 leading-relaxed">
               {BUSINESS_INFO.tagline}. A dedicated sports destination in Hetauda providing quality playing grounds, well-maintained turf, and convenient Pay on Arrival reservations.
             </p>
