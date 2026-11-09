@@ -22,6 +22,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Share2,
+  Printer,
 } from 'lucide-react';
 
 /* ─── LIVE PULSATING RADAR / WAITING ANIMATION ─── */
@@ -399,6 +400,18 @@ export const OrderDetailsPage: React.FC = () => {
             View All My Bookings
           </Button>
         </Link>
+
+        {isConfirmed && (
+          <Button
+            variant="outline"
+            size="md"
+            className="w-full sm:w-auto font-bold bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+            leftIcon={<Printer className="w-4 h-4" />}
+            onClick={() => window.print()}
+          >
+            Print / Save Ticket
+          </Button>
+        )}
 
         <Link to="/book" className="w-full sm:w-auto">
           <Button

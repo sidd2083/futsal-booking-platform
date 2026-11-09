@@ -2,7 +2,7 @@ import React from 'react';
 import { CourtSlot } from '@/types';
 import { formatNPR, formatSlotTime } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-import { Check, Clock, Lock, ArrowUpRight, Sparkles } from 'lucide-react';
+import { Check, Clock, Lock, ArrowUpRight, Sparkles, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SlotGridProps {
@@ -30,7 +30,7 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
         <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-xs">
           <div className="flex items-center gap-1.5">
             <div className="w-3.5 h-3.5 rounded-md border-2 border-surface-300 bg-white shadow-sm" />
-            <span className="text-surface-700 font-medium">Available (Hover to Book)</span>
+            <span className="text-surface-700 font-medium">Available</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3.5 h-3.5 rounded-md bg-red-600 border border-red-700 shadow-sm" />
@@ -44,12 +44,18 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
             <div className="w-3.5 h-3.5 rounded-md bg-amber-500 border border-amber-600 shadow-sm" />
             <span className="text-surface-700 font-medium">Under Review</span>
           </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3.5 h-3.5 rounded-md bg-surface-200 border border-surface-300 shadow-sm" />
+            <span className="text-surface-700 font-medium">Past / Closed</span>
+          </div>
         </div>
       </div>
 
       {/* Grid of 11 Hourly Slots with Fluid Hover Motion */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
         {slots.map((slot) => {
+          const isPastSlot = slot.status === 'disabled';
+
           const isUserConfirmed =
             slot.status === 'confirmed' && user && slot.userId === user.uid;
 
@@ -68,7 +74,13 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
           let statusText = '';
           let isClickable = false;
 
-          if (isUserConfirmed) {
+          if (isPastSlot) {
+            // GREY: Time has passed — cannot book
+            cardStyle =
+              'bg-surface-100 text-surface-400 border-surface-200 opacity-60 cursor-not-allowed';
+            statusText = 'Past / Closed';
+            isClickable = false;
+          } else if (isUserConfirmed) {
             // GREEN: Current customer's confirmed booking
             cardStyle =
               'bg-gradient-to-br from-emerald-600 to-emerald-700 text-white border-emerald-800 shadow-md cursor-default ring-2 ring-emerald-500/50';
@@ -122,6 +134,7 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
                   {formatSlotTime(slot.startTime, slot.endTime)}
                 </span>
 
+                {isPastSlot && <Ban className="w-3.5 h-3.5 shrink-0 text-surface-400" />}
                 {isUserConfirmed && <Check className="w-4 h-4 shrink-0 text-white" />}
                 {isOtherConfirmed && <Lock className="w-3.5 h-3.5 shrink-0 text-white/90" />}
                 {isOtherPending && <Clock className="w-3.5 h-3.5 shrink-0 text-white/90" />}

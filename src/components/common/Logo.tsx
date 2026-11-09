@@ -27,10 +27,10 @@ export const Logo: React.FC<LogoProps> = ({
 
   // Size mappings for the crest image
   const sizeStyles = {
-    sm: 'h-10 sm:h-11',
-    md: 'h-13 sm:h-15 md:h-16',
-    lg: 'h-16 sm:h-20',
-    xl: 'h-24 sm:h-28 md:h-32',
+    sm: 'h-9 sm:h-10',
+    md: 'h-11 sm:h-12 md:h-14',
+    lg: 'h-14 sm:h-16 md:h-20',
+    xl: 'h-20 sm:h-24 md:h-28',
   }[size];
 
   const titleSizes = {

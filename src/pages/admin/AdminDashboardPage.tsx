@@ -82,6 +82,9 @@ export const AdminDashboardPage: React.FC = () => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
+  // Approve confirmation modal state
+  const [approvingOrder, setApprovingOrder] = useState<BookingOrder | null>(null);
+
   // Hourly slots (10:00 AM to 9:00 PM)
   const availableSlotTimes = useMemo(() => {
     return generateHourlySlotDefinitions(10, 21);
@@ -145,11 +148,17 @@ export const AdminDashboardPage: React.FC = () => {
       .reduce((sum, o) => sum + o.totalAmount, 0);
   }, [orders, customRangeStart, customRangeEnd]);
 
-  // Approve action
-  const handleApprove = async (orderId: string) => {
-    setProcessingId(orderId);
-    await adminApproveBooking(orderId);
+  // Approve action — requires confirmation modal first
+  const handleApproveClick = (order: BookingOrder) => {
+    setApprovingOrder(order);
+  };
+
+  const handleApproveConfirm = async () => {
+    if (!approvingOrder) return;
+    setProcessingId(approvingOrder.id);
+    await adminApproveBooking(approvingOrder.id);
     setProcessingId(null);
+    setApprovingOrder(null);
   };
 
   // Reject action
@@ -292,10 +301,10 @@ export const AdminDashboardPage: React.FC = () => {
 
   // ─── GOD-LEVEL SIDEBAR + CONTENT WORKSPACE ───
   return (
-    <div className="flex min-h-[calc(100vh-80px)] bg-surface-50">
+    <div className="flex h-[calc(100vh-64px)] sm:h-[calc(100vh-72px)] md:h-[calc(100vh-80px)] bg-surface-50 overflow-hidden">
 
       {/* ─── LEFT SIDEBAR NAVIGATION ─── */}
-      <aside className="w-64 sm:w-72 bg-surface-900 text-surface-300 border-r border-surface-800 flex flex-col justify-between shrink-0 select-none">
+      <aside className="w-64 sm:w-72 bg-surface-900 text-surface-300 border-r border-surface-800 flex flex-col justify-between shrink-0 select-none overflow-y-auto">
         <div>
           {/* Admin Identity Card */}
           <div className="p-5 border-b border-surface-800/80">
@@ -460,7 +469,7 @@ export const AdminDashboardPage: React.FC = () => {
       </aside>
 
       {/* ─── RIGHT CONTENT WORKSPACE ─── */}
-      <main className="flex-1 p-6 sm:p-10 overflow-y-auto">
+      <main className="flex-1 p-6 sm:p-10 overflow-y-auto h-full">
 
         {/* 1. OVERVIEW & METRICS */}
         {activeView === 'overview' && (
@@ -684,13 +693,12 @@ export const AdminDashboardPage: React.FC = () => {
                         variant="primary"
                         size="sm"
                         className="font-black bg-emerald-700 hover:bg-emerald-800 shadow-sm"
-                        onClick={() => handleApprove(order.id)}
+                        onClick={() => handleApproveClick(order)}
                         isLoading={processingId === order.id}
                         leftIcon={<Check className="w-4 h-4" />}
                       >
                         Approve &amp; Lock Slot
-                      </Button>
-                    </div>
+                      </Button>                    </div>
                   </div>
                 ))}
               </div>
@@ -1152,6 +1160,42 @@ export const AdminDashboardPage: React.FC = () => {
                 isLoading={processingId === rejectingOrder.id}
               >
                 Confirm Decline
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Approve Confirmation Modal */}
+      {approvingOrder && (
+        <Modal
+          isOpen={true}
+          onClose={() => setApprovingOrder(null)}
+          title="Confirm Booking Approval"
+          description={`Approve ${approvingOrder.customerName}'s booking for ${approvingOrder.date} at ${formatSlotTime(approvingOrder.startTime, approvingOrder.endTime)}? This will lock the slot and generate a booking code.`}
+        >
+          <div className="space-y-4">
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1.5">
+              <p><span className="font-bold">Player:</span> {approvingOrder.customerName}</p>
+              <p><span className="font-bold">Phone:</span> {approvingOrder.customerPhone}</p>
+              <p><span className="font-bold">Date:</span> {approvingOrder.date}</p>
+              <p><span className="font-bold">Time:</span> {formatSlotTime(approvingOrder.startTime, approvingOrder.endTime)}</p>
+              <p><span className="font-bold">Amount:</span> {formatNPR(approvingOrder.totalAmount)}</p>
+              <p><span className="font-bold">Payment:</span> {approvingOrder.paymentMethod === 'pay_online' ? 'Pay Online' : 'Pay on Arrival'}</p>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setApprovingOrder(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="bg-emerald-700 hover:bg-emerald-800 font-black"
+                onClick={handleApproveConfirm}
+                isLoading={processingId === approvingOrder.id}
+                leftIcon={<CheckCircle2 className="w-4 h-4" />}
+              >
+                Yes, Confirm Booking
               </Button>
             </div>
           </div>

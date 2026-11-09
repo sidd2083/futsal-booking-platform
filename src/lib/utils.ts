@@ -14,10 +14,9 @@ export function formatNPR(amount: number): string {
 }
 
 /**
- * Returns current date and time formatted in Nepal Timezone (Asia/Kathmandu).
+ * Returns current date and time formatted in Nepal Timezone (Asia/Kathmandu, UTC+5:45).
  */
 export function getNepalCurrentDate(): Date {
-  // Compute current time adjusted to UTC+5:45 (Nepal Time)
   const now = new Date();
   const utcOffsetMs = now.getTime() + now.getTimezoneOffset() * 60000;
   const nepalOffsetMs = 5.75 * 3600000;
@@ -57,6 +56,27 @@ export function formatSlotTime(startTime: string, endTime: string): string {
   };
 
   return `${formatTime(startTime)} – ${formatTime(endTime)}`;
+}
+
+/**
+ * Check if a slot time has already passed in Nepal local time (UTC+5:45).
+ * A slot is considered passed if its START hour <= current Nepal hour.
+ * e.g. at 6:08 PM (18:08 Nepal), slots for 10AM, 11AM ... 6PM (18:00) are all past/disabled.
+ */
+export function isSlotPassedInNepal(dateString: string, startTime: string): boolean {
+  const nepalToday = getNepalTodayFormatted();
+  if (dateString < nepalToday) return true; // Any past date is blocked
+  if (dateString > nepalToday) return false; // Future dates are always open
+
+  // Same day: compare slot start against current Nepal time
+  const nepalNow = getNepalCurrentDate();
+  const currentHour = nepalNow.getHours();
+
+  const [slotHour] = startTime.split(':').map(Number);
+
+  // Block any slot whose start hour is <= current hour (the hour is either past or already started)
+  // This means at 18:08, slot 18:00–19:00 is blocked; slot 19:00–20:00 is open.
+  return slotHour <= currentHour;
 }
 
 /**

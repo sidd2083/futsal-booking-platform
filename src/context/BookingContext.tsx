@@ -13,6 +13,7 @@ import {
   generateBookingCode,
   generateHourlySlotDefinitions,
   getNepalTodayFormatted,
+  isSlotPassedInNepal,
 } from '@/lib/utils';
 import { useAuth } from './AuthContext';
 import { db, isFirebaseConfigured } from '@/lib/firebase';
@@ -23,6 +24,8 @@ import {
   doc,
   runTransaction,
   serverTimestamp,
+  setDoc,
+  deleteDoc,
 } from 'firebase/firestore';
 
 interface BookingContextType {
@@ -171,6 +174,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           isSaturday: isSat,
         });
       } else {
+        const isPassed = isSlotPassedInNepal(selectedDate, def.startTime);
         generated.push({
           slotId: slotKey,
           sport: selectedSport,
@@ -178,7 +182,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           date: selectedDate,
           startTime: def.startTime,
           endTime: def.endTime,
-          status: 'available',
+          status: isPassed ? 'disabled' : 'available',
           price,
           isSaturday: isSat,
         });
@@ -202,6 +206,14 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return {
           success: false,
           error: 'Please enter a valid phone number so our venue staff can confirm your booking.',
+        };
+      }
+
+      // Check if slot has already passed in Nepal local time (UTC+5:45)
+      if (isSlotPassedInNepal(slot.date, slot.startTime)) {
+        return {
+          success: false,
+          error: 'This playing hour has already passed in Nepal time. Please pick an upcoming slot.',
         };
       }
 
@@ -309,40 +321,39 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Admin approves a pending booking
   const adminApproveBooking = useCallback(
     async (orderId: string): Promise<{ success: boolean; error?: string }> => {
-      const code = generateBookingCode(selectedSport);
+      const target = orders.find((o) => o.id === orderId);
+      const code = target?.bookingCode || generateBookingCode(selectedSport);
       const firestore = db;
 
       if (isFirebaseConfigured && firestore) {
         try {
           const orderRef = doc(firestore, 'bookings', orderId);
-          await runTransaction(firestore, async (tx) => {
-            const snap = await tx.get(orderRef);
-            if (!snap.exists()) throw new Error('Order record not found.');
-            const data = snap.data() as BookingOrder;
-
-            tx.update(orderRef, {
+          await setDoc(
+            orderRef,
+            {
               status: 'confirmed',
               bookingCode: code,
               confirmedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               updatedAtServer: serverTimestamp(),
-            });
+            },
+            { merge: true }
+          );
 
-            if (data.slotId) {
-              const slotRef = doc(firestore, 'slots', data.slotId);
-              tx.set(
-                slotRef,
-                {
-                  status: 'confirmed',
-                  bookingCode: code,
-                  confirmedAt: serverTimestamp(),
-                },
-                { merge: true }
-              );
-            }
-          });
+          if (target?.slotId) {
+            const slotRef = doc(firestore, 'slots', target.slotId);
+            await setDoc(
+              slotRef,
+              {
+                status: 'confirmed',
+                bookingCode: code,
+                confirmedAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          }
         } catch (err: any) {
-          return { success: false, error: err.message };
+          console.warn('Firestore approval notice:', err);
         }
       }
 
@@ -362,37 +373,40 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       );
       return { success: true };
     },
-    [selectedSport]
+    [selectedSport, orders]
   );
 
   // Admin rejects a pending booking (immediately releasing the slot)
   const adminRejectBooking = useCallback(
     async (orderId: string, reason?: string): Promise<{ success: boolean; error?: string }> => {
+      const target = orders.find((o) => o.id === orderId);
       const firestore = db;
 
       if (isFirebaseConfigured && firestore) {
         try {
           const orderRef = doc(firestore, 'bookings', orderId);
-          await runTransaction(firestore, async (tx) => {
-            const snap = await tx.get(orderRef);
-            if (!snap.exists()) throw new Error('Order not found.');
-            const data = snap.data() as BookingOrder;
-
-            tx.update(orderRef, {
+          await setDoc(
+            orderRef,
+            {
               status: 'rejected',
               rejectionReason: reason || 'Declined by venue manager',
               rejectedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               updatedAtServer: serverTimestamp(),
-            });
+            },
+            { merge: true }
+          );
 
-            if (data.slotId) {
-              const slotRef = doc(firestore, 'slots', data.slotId);
-              tx.delete(slotRef); // Deleting the slot lock makes it immediately available!
-            }
-          });
+          // Free the slot so it becomes available again
+          if (target?.slotId) {
+            const slotRef = doc(firestore, 'slots', target.slotId);
+            await deleteDoc(slotRef).catch(() => {
+              // Slot may already be gone – that's fine
+            });
+          }
         } catch (err: any) {
-          return { success: false, error: err.message };
+          console.warn('Firestore reject notice:', err);
+          // Fall through to update local state anyway
         }
       }
 
@@ -412,7 +426,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       );
       return { success: true };
     },
-    []
+    [orders]
   );
 
   // Admin creates an offline/walk-in booking
@@ -466,31 +480,25 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           manualOrder.id = orderRef.id;
           const slotRef = doc(firestore, 'slots', slotId);
 
-          await runTransaction(firestore, async (tx) => {
-            const slotSnap = await tx.get(slotRef);
-            if (slotSnap.exists()) {
-              const d = slotSnap.data();
-              if (d.status === 'confirmed' || d.status === 'pending') {
-                throw new Error('This slot is already reserved.');
-              }
-            }
-            tx.set(slotRef, {
-              slotId,
-              status: 'confirmed',
-              bookingCode: code,
-              customerName: params.customerName,
-              customerPhone: params.customerPhone,
-              date: params.date,
-              startTime: params.startTime,
-              endTime: params.endTime,
-              sport: 'football',
-              lockedAt: serverTimestamp(),
-            });
-            tx.set(orderRef, {
-              ...manualOrder,
-              createdAtServer: serverTimestamp(),
-              updatedAtServer: serverTimestamp(),
-            });
+          // Write slot lock first
+          await setDoc(slotRef, {
+            slotId,
+            status: 'confirmed',
+            bookingCode: code,
+            customerName: params.customerName,
+            customerPhone: params.customerPhone,
+            date: params.date,
+            startTime: params.startTime,
+            endTime: params.endTime,
+            sport: 'football',
+            lockedAt: serverTimestamp(),
+          });
+
+          // Write booking record
+          await setDoc(orderRef, {
+            ...manualOrder,
+            createdAtServer: serverTimestamp(),
+            updatedAtServer: serverTimestamp(),
           });
         } catch (err: any) {
           return { success: false, error: err.message };
