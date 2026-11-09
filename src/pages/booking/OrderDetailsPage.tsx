@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Share2,
   Printer,
+  Download,
 } from 'lucide-react';
 
 /* ─── LIVE PULSATING RADAR / WAITING ANIMATION ─── */
@@ -77,45 +78,64 @@ export const OrderDetailsPage: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Load and listen in real-time to this order
+  // ── Sync with live orders from BookingContext ──
+  // Whenever BookingContext updates (via admin approval or Firestore snapshot),
+  // automatically reflect it immediately so the pass updates in real-time.
   useEffect(() => {
     if (!orderId) return;
 
-    // 1. First check local memory / localStorage
-    const localMatch = orders.find((o) => o.id === orderId);
-    if (localMatch) {
-      setOrder(localMatch);
-    } else {
+    // Check in-memory context first
+    const contextMatch = orders.find((o) => o.id === orderId || o.bookingCode === orderId);
+    if (contextMatch) {
+      setOrder((prev) => {
+        // If context match is confirmed, always prefer it!
+        if (contextMatch.status === 'confirmed') return contextMatch;
+        return prev?.status === 'confirmed' ? prev : contextMatch;
+      });
+      return;
+    }
+
+    // Fall back to localStorage
+    try {
       const saved = localStorage.getItem('maya_local_booking_orders');
       if (saved) {
-        try {
-          const parsed: BookingOrder[] = JSON.parse(saved);
-          const found = parsed.find((o) => o.id === orderId);
-          if (found) setOrder(found);
-        } catch {
-          // ignore
+        const parsed: BookingOrder[] = JSON.parse(saved);
+        const found = parsed.find((o) => o.id === orderId || o.bookingCode === orderId);
+        if (found) {
+          setOrder((prev) => (prev?.status === 'confirmed' ? prev : found));
         }
       }
-    }
-
-    // 2. Attach live Firestore snapshot listener
-    if (isFirebaseConfigured && db) {
-      const orderRef = doc(db, 'bookings', orderId);
-      const unsubscribe = onSnapshot(
-        orderRef,
-        (snap) => {
-          if (snap.exists()) {
-            setOrder({ id: snap.id, ...(snap.data() as any) } as BookingOrder);
-          }
-        },
-        (err) => {
-          console.warn('Real-time order listener notice:', err);
-        }
-      );
-
-      return () => unsubscribe();
+    } catch {
+      // ignore
     }
   }, [orderId, orders]);
+
+  // ── Firestore real-time listener for direct document updates ──
+  useEffect(() => {
+    if (!orderId || !isFirebaseConfigured || !db) return;
+
+    const orderRef = doc(db, 'bookings', orderId);
+    const unsubscribe = onSnapshot(
+      orderRef,
+      (snap) => {
+        if (snap.exists()) {
+          const remoteData = { id: snap.id, ...(snap.data() as any) } as BookingOrder;
+          setOrder((prev) => {
+            // Keep confirmed state if already confirmed
+            if (prev?.status === 'confirmed' && remoteData.status === 'pending') {
+              return prev;
+            }
+            return remoteData;
+          });
+        }
+      },
+      (err) => {
+        console.warn('Order listener:', err);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [orderId]);
 
   const handleCopyCode = () => {
     if (!order?.bookingCode) return;
@@ -128,6 +148,53 @@ export const OrderDetailsPage: React.FC = () => {
     navigator.clipboard.writeText(window.location.href);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleDownloadReceipt = () => {
+    if (!order) return;
+    const content = `===================================================
+             MAYA SPORTS CENTRE
+         Hetauda's No. 1 Sports Destination
+   C2FW+8VG, Rai Tole Marg, Hetauda, Nepal
+            Phone: +977 9714577877
+===================================================
+
+       OFFICIAL MATCH RESERVATION PASS
+---------------------------------------------------
+BOOKING CODE   : ${order.bookingCode || 'PENDING'}
+STATUS         : ${order.status.toUpperCase()}
+SPORT          : ${order.sport.toUpperCase()}
+COURT          : ${order.courtName || 'Maya Turf Ground'}
+DATE           : ${order.date}
+TIME SLOT      : ${formatSlotTime(order.startTime, order.endTime)} (60 Mins)
+TOTAL FEE      : ${formatNPR(order.totalAmount)}
+PAYMENT METHOD : ${order.paymentMethod === 'pay_online' ? 'Online (eSewa / Khalti)' : 'Pay on Arrival at Counter'}
+PAYMENT STATUS : ${order.paymentStatus === 'received' ? 'PAID / RECEIVED' : 'PAYABLE AT VENUE'}
+
+PLAYER DETAILS
+---------------------------------------------------
+NAME           : ${order.customerName}
+PHONE          : ${order.customerPhone}
+EMAIL          : ${order.customerEmail || 'N/A'}
+NOTE           : ${order.notes || 'None'}
+
+ISSUED AT      : ${new Date(order.confirmedAt || order.createdAt).toLocaleString()}
+---------------------------------------------------
+* Please present this pass and Booking Code at the
+  counter before entering the ground.
+* Maya Sports Centre is open 7 days a week:
+  10:00 AM – 9:00 PM.
+===================================================`;
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `MayaSports_Pass_${order.bookingCode || order.id.slice(-6)}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   if (!order) {
@@ -402,15 +469,27 @@ export const OrderDetailsPage: React.FC = () => {
         </Link>
 
         {isConfirmed && (
-          <Button
-            variant="outline"
-            size="md"
-            className="w-full sm:w-auto font-bold bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-50"
-            leftIcon={<Printer className="w-4 h-4" />}
-            onClick={() => window.print()}
-          >
-            Print / Save Ticket
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="md"
+              className="w-full sm:w-auto font-bold bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+              leftIcon={<Printer className="w-4 h-4" />}
+              onClick={() => window.print()}
+            >
+              Print Ticket
+            </Button>
+
+            <Button
+              variant="outline"
+              size="md"
+              className="w-full sm:w-auto font-bold bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+              leftIcon={<Download className="w-4 h-4" />}
+              onClick={handleDownloadReceipt}
+            >
+              Download Pass
+            </Button>
+          </>
         )}
 
         <Link to="/book" className="w-full sm:w-auto">

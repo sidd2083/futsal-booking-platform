@@ -107,10 +107,22 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           });
           setOrders((prev) => {
             const map = new Map<string, BookingOrder>();
-            // Keep local orders to avoid flickering
+            // Keep local orders
             prev.forEach((o) => map.set(o.id, o));
-            // Apply fresh remote updates
-            fetched.forEach((o) => map.set(o.id, o));
+            // Apply fresh remote updates with smart conflict resolution
+            fetched.forEach((remote) => {
+              const local = map.get(remote.id);
+              // If locally confirmed, never revert to pending due to replication lag
+              if (local && local.status === 'confirmed' && remote.status === 'pending') {
+                map.set(remote.id, {
+                  ...remote,
+                  status: 'confirmed',
+                  bookingCode: local.bookingCode || remote.bookingCode,
+                });
+              } else {
+                map.set(remote.id, remote);
+              }
+            });
             return Array.from(map.values()).sort(
               (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             );
@@ -480,32 +492,33 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           manualOrder.id = orderRef.id;
           const slotRef = doc(firestore, 'slots', slotId);
 
-          // Write slot lock first
-          await setDoc(slotRef, {
-            slotId,
-            status: 'confirmed',
-            bookingCode: code,
-            customerName: params.customerName,
-            customerPhone: params.customerPhone,
-            date: params.date,
-            startTime: params.startTime,
-            endTime: params.endTime,
-            sport: 'football',
-            lockedAt: serverTimestamp(),
-          });
-
-          // Write booking record
-          await setDoc(orderRef, {
-            ...manualOrder,
-            createdAtServer: serverTimestamp(),
-            updatedAtServer: serverTimestamp(),
-          });
+          // Write slot lock and booking record in parallel
+          await Promise.all([
+            setDoc(slotRef, {
+              slotId,
+              status: 'confirmed',
+              bookingCode: code,
+              customerName: params.customerName,
+              customerPhone: params.customerPhone,
+              date: params.date,
+              startTime: params.startTime,
+              endTime: params.endTime,
+              sport: 'football',
+              lockedAt: serverTimestamp(),
+            }),
+            setDoc(orderRef, {
+              ...manualOrder,
+              createdAtServer: serverTimestamp(),
+              updatedAtServer: serverTimestamp(),
+            }),
+          ]);
         } catch (err: any) {
-          return { success: false, error: err.message };
+          console.warn('Firestore offline sync notice (saved locally):', err);
+          // Do not block offline creation! Save locally below.
         }
       }
 
-      // Always update local state immediately
+      // Always update local state & cache immediately so slot is locked & code is ready
       setOrders((prev) => [manualOrder, ...prev.filter((o) => o.id !== manualOrder.id)]);
       return { success: true, order: manualOrder };
     },

@@ -301,7 +301,7 @@ export const AdminDashboardPage: React.FC = () => {
 
   // ─── GOD-LEVEL SIDEBAR + CONTENT WORKSPACE ───
   return (
-    <div className="flex h-[calc(100vh-64px)] sm:h-[calc(100vh-72px)] md:h-[calc(100vh-80px)] bg-surface-50 overflow-hidden">
+    <div className="flex h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] bg-surface-50 overflow-hidden">
 
       {/* ─── LEFT SIDEBAR NAVIGATION ─── */}
       <aside className="w-64 sm:w-72 bg-surface-900 text-surface-300 border-r border-surface-800 flex flex-col justify-between shrink-0 select-none overflow-y-auto">

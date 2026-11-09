@@ -14,10 +14,6 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
-  query,
-  collection,
-  where,
-  getDocs,
 } from 'firebase/firestore';
 
 interface AuthContextType {
@@ -47,83 +43,63 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'maya_auth_cached_profile';
 
+const PHONE_REGISTRY_CACHE_KEY = 'maya_phone_registry_cache';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  // ── Instant User Hydration from Local Cache (0ms delay) ──
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    try {
+      const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    try {
+      const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (cached) {
+        const p = JSON.parse(cached);
+        return p.role === 'admin' || p.isAdmin === true;
+      }
+    } catch {}
+    return false;
+  });
+
+  const [loading, setLoading] = useState<boolean>(false);
   const [needsProfileCompletion, setNeedsProfileCompletion] = useState<boolean>(false);
 
-  // Check admin status against /adminUsers or /admins by UID, Email, or field query
+  // Fast, non-blocking admin role check
   const checkAdminRole = useCallback(async (uid: string, email?: string | null): Promise<boolean> => {
     if (!db) return false;
     try {
-      // 1. Check by UID in admin collections
-      const uidDoc1 = await getDoc(doc(db, 'adminUsers', uid));
-      if (uidDoc1.exists()) {
-        const d = uidDoc1.data();
-        if (!d.role || d.role.toLowerCase() === 'admin') return true;
-      }
-      const uidDoc2 = await getDoc(doc(db, 'admins', uid));
-      if (uidDoc2.exists()) {
-        const d = uidDoc2.data();
-        if (!d.role || d.role.toLowerCase() === 'admin') return true;
-      }
+      const cleanEmail = email?.trim().toLowerCase();
 
-      // 2. Check by Email as document ID or query field
-      if (email) {
-        const cleanEmail = email.trim();
-        const lowerEmail = cleanEmail.toLowerCase();
+      // Quick parallel lookup for admin identity
+      const checks: Promise<boolean>[] = [
+        getDoc(doc(db, 'adminUsers', uid)).then((s) => s.exists()),
+        getDoc(doc(db, 'admins', uid)).then((s) => s.exists()),
+        getDoc(doc(db, 'users', uid)).then((s) => {
+          if (!s.exists()) return false;
+          const d = s.data();
+          return d.role?.toLowerCase() === 'admin' || d.isAdmin === true;
+        }),
+      ];
 
-        const emailDoc1 = await getDoc(doc(db, 'adminUsers', cleanEmail));
-        if (emailDoc1.exists()) return true;
-
-        const emailDoc2 = await getDoc(doc(db, 'adminUsers', lowerEmail));
-        if (emailDoc2.exists()) return true;
-
-        const emailDoc3 = await getDoc(doc(db, 'admins', cleanEmail));
-        if (emailDoc3.exists()) return true;
-
-        const emailDoc4 = await getDoc(doc(db, 'admins', lowerEmail));
-        if (emailDoc4.exists()) return true;
-
-        // Query by email field
-        try {
-          const q1 = query(collection(db, 'adminUsers'), where('email', '==', cleanEmail));
-          const snap1 = await getDocs(q1);
-          if (!snap1.empty) return true;
-
-          const q2 = query(collection(db, 'adminUsers'), where('email', '==', lowerEmail));
-          const snap2 = await getDocs(q2);
-          if (!snap2.empty) return true;
-
-          const q3 = query(collection(db, 'admins'), where('email', '==', cleanEmail));
-          const snap3 = await getDocs(q3);
-          if (!snap3.empty) return true;
-
-          const q4 = query(collection(db, 'admins'), where('email', '==', lowerEmail));
-          const snap4 = await getDocs(q4);
-          if (!snap4.empty) return true;
-        } catch {
-          // ignore query permission errors
-        }
+      if (cleanEmail) {
+        checks.push(getDoc(doc(db, 'adminUsers', cleanEmail)).then((s) => s.exists()));
+        checks.push(getDoc(doc(db, 'admins', cleanEmail)).then((s) => s.exists()));
       }
 
-      // 3. Check user profile's own role attribute
-      const userSnap = await getDoc(doc(db, 'users', uid));
-      if (userSnap.exists()) {
-        const data = userSnap.data();
-        if (
-          data.role?.toLowerCase() === 'admin' ||
-          data.isAdmin === true ||
-          data.role === 'Admin'
-        ) {
-          return true;
-        }
-      }
+      // 2-second timeout protection so auth never hangs
+      const timeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000));
+      const anyMatch = Promise.all(checks).then((results) => results.some(Boolean));
+      return await Promise.race([anyMatch, timeout]);
     } catch (err) {
-      console.warn('Admin check error:', err);
+      console.warn('Admin check warning:', err);
+      return false;
     }
-    return false;
   }, []);
 
   // Sync profile from Firestore for a given Firebase User
@@ -291,7 +267,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (cleanPhone.length < 8) {
       return { success: false, error: 'Please enter a valid Nepali mobile number (at least 8 digits).' };
     }
-    if (!params.email.includes('@')) {
+    const cleanEmail = params.email.trim().toLowerCase();
+    if (!cleanEmail.includes('@')) {
       return { success: false, error: 'Please enter a valid email address.' };
     }
     if (params.password.length < 6) {
@@ -305,28 +282,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Firebase is not initialized.' };
     }
 
-    // Prevent duplicate phone numbers across accounts
+    // ── STRICT PHONE UNIQUENESS CHECK ──
+    // 1. Check local registry cache
+    try {
+      const localPhoneMapStr = localStorage.getItem(PHONE_REGISTRY_CACHE_KEY);
+      if (localPhoneMapStr) {
+        const localMap: Record<string, string> = JSON.parse(localPhoneMapStr);
+        if (localMap[cleanPhone] && localMap[cleanPhone].toLowerCase() !== cleanEmail) {
+          return {
+            success: false,
+            error: `This mobile number (${cleanPhone}) is already registered to another player account. Each phone number can only be used once.`,
+          };
+        }
+      }
+    } catch {
+      // ignore parse error
+    }
+
+    // 2. Check Firestore phoneRegistry document
     try {
       const phoneSnap = await getDoc(doc(db, 'phoneRegistry', cleanPhone));
       if (phoneSnap.exists()) {
-        return {
-          success: false,
-          error: 'This mobile number is already registered to another player account. Each phone number can only be used once.',
-        };
+        const registeredEmail = phoneSnap.data()?.email?.toLowerCase();
+        if (registeredEmail && registeredEmail !== cleanEmail) {
+          return {
+            success: false,
+            error: `This mobile number (${cleanPhone}) is already registered to another player account. Please use your own unique number or sign in.`,
+          };
+        }
       }
     } catch (err) {
       console.warn('Phone uniqueness check error:', err);
     }
 
     try {
-      const cred = await createUserWithEmailAndPassword(auth, params.email.trim(), params.password);
+      const cred = await createUserWithEmailAndPassword(auth, cleanEmail, params.password);
       const uid = cred.user.uid;
       const nowIso = new Date().toISOString();
 
       const profile: UserProfile = {
         uid,
         fullName: params.fullName.trim(),
-        email: params.email.trim().toLowerCase(),
+        email: cleanEmail,
         phoneNumber: cleanPhone,
         authProvider: 'password',
         role: 'customer',
@@ -334,17 +331,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updatedAt: nowIso,
       };
 
+      // Save user document
       await setDoc(doc(db, 'users', uid), {
         ...profile,
         createdAtServer: serverTimestamp(),
         updatedAtServer: serverTimestamp(),
       });
 
-      // Claim phone number in registry
+      // Claim phone number in local cache
+      try {
+        const localPhoneMapStr = localStorage.getItem(PHONE_REGISTRY_CACHE_KEY);
+        const localMap: Record<string, string> = localPhoneMapStr ? JSON.parse(localPhoneMapStr) : {};
+        localMap[cleanPhone] = cleanEmail;
+        localStorage.setItem(PHONE_REGISTRY_CACHE_KEY, JSON.stringify(localMap));
+      } catch {
+        // ignore
+      }
+
+      // Claim phone number in Firestore registry
       try {
         await setDoc(doc(db, 'phoneRegistry', cleanPhone), {
           uid,
-          email: params.email.trim().toLowerCase(),
+          email: cleanEmail,
           createdAt: serverTimestamp(),
         });
       } catch (err) {
@@ -365,7 +373,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: string,
     password: string
   ): Promise<{ success: boolean; error?: string }> => {
-    if (!email.trim() || !password) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
       return { success: false, error: 'Please enter your email and password.' };
     }
 
@@ -374,8 +383,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
-      await syncUserProfile(cred.user, 'password');
+      const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      // Run profile sync in background so login returns immediately
+      syncUserProfile(cred.user, 'password').catch((err) =>
+        console.warn('Background sync error (non-fatal):', err)
+      );
       return { success: true };
     } catch (err: any) {
       return { success: false, error: formatAuthError(err) };

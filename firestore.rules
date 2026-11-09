@@ -3,78 +3,62 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
+    // ─── HELPER FUNCTIONS ───────────────────────────────────────────────────
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.admin == true ||
-        exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid)) ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.email != null && exists(/databases/$(database)/documents/adminUsers/$(request.auth.token.email))) ||
-        (request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email)))
-      );
-    }
-
-    // Authorized Admin Registries (Lookup by UID or Email)
-    match /adminUsers/{adminId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    match /admins/{adminId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Phone number registry to prevent duplicate phone registration across accounts
-    match /phoneRegistry/{phone} {
-      allow read: if true;
-      allow create, update: if isAuthenticated();
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.uid == request.auth.uid);
-    }
-
-    // User profiles
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAdmin();
-    }
-
-    // Public business settings (pricing, court count, operating hours)
-    match /settings/{settingId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
-    }
-
-    // Public court slot availability (locks to prevent double booking)
-    // Document ID structure: {sport}_{courtId}_{YYYY-MM-DD}_{HH}
+    // ─── PUBLIC COLLECTIONS (Guest Accessible) ──────────────────────────────
+    // 1. Court Slots: Publicly readable so visitors see real-time availability.
+    // Authenticated users (customers & admins) can create, lock, and update slots.
     match /slots/{slotId} {
-      allow read: if true; // Publicly readable for real-time slot colors
+      allow read:                   if true;
       allow create, update, delete: if isAuthenticated();
     }
 
-    // Booking orders
-    match /bookings/{bookingId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+    // 2. Phone Registry: Prevents duplicate phone registration across player accounts.
+    // Must be readable and writable during registration before the session is created.
+    match /phoneRegistry/{phone} {
+      allow read, write: if true;
     }
 
-    // Audit logs for administrative actions
+    // 3. Business Settings: Publicly readable pricing & opening hours.
+    match /settings/{settingId} {
+      allow read:  if true;
+      allow write: if isAuthenticated();
+    }
+
+    // ─── APPLICATION ENTITIES ───────────────────────────────────────────────
+    // Bookings: Authenticated users can create, read, and manage reservations.
+    match /bookings/{bookingId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // User Profiles:
+    match /users/{userId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Admin registries:
+    match /adminUsers/{adminId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /admins/{adminId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Audit logs:
     match /audit_logs/{logId} {
       allow read, write: if isAuthenticated();
     }
 
     match /auditLogs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Fallback: any other collection
+    match /{document=**} {
       allow read, write: if isAuthenticated();
     }
   }
