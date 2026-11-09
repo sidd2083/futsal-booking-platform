@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useBooking } from '@/context/BookingContext';
-import { formatNPR, formatSlotTime } from '@/lib/utils';
+import { formatNPR, formatSlotTime, getNepalTodayFormatted, cn } from '@/lib/utils';
+import { BookingOrder } from '@/types';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { AuthModal } from '@/components/common/AuthModal';
@@ -22,6 +23,26 @@ export const CustomerBookingsPage: React.FC = () => {
   const { userOrders } = useBooking();
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [filterTab, setFilterTab] = useState<'all' | 'waiting' | 'approved' | 'played'>('all');
+
+  const nepalToday = useMemo(() => getNepalTodayFormatted(), []);
+
+  const waitingOrders = useMemo(() => userOrders.filter((o) => o.status === 'pending'), [userOrders]);
+  const approvedOrders = useMemo(
+    () => userOrders.filter((o) => o.status === 'confirmed' && o.date >= nepalToday),
+    [userOrders, nepalToday]
+  );
+  const playedOrders = useMemo(
+    () => userOrders.filter((o) => o.date < nepalToday || o.status === 'expired' || (o.status === 'confirmed' && o.date < nepalToday)),
+    [userOrders, nepalToday]
+  );
+
+  const displayedOrders = useMemo(() => {
+    if (filterTab === 'waiting') return waitingOrders;
+    if (filterTab === 'approved') return approvedOrders;
+    if (filterTab === 'played') return playedOrders;
+    return userOrders;
+  }, [filterTab, userOrders, waitingOrders, approvedOrders, playedOrders]);
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -91,21 +112,67 @@ export const CustomerBookingsPage: React.FC = () => {
 
       {/* Bookings List */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-surface-900 tracking-tight">
-            My Booking Slips ({userOrders.length})
-          </h2>
-          <span className="text-xs text-surface-500">
-            Show your code at the counter upon arrival
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base sm:text-lg font-black text-surface-900 tracking-tight">
+              My Orders &amp; Booking History ({userOrders.length})
+            </h2>
+            <span className="text-xs text-surface-500">
+              Live slips, staff verification status, and confirmed match codes
+            </span>
+          </div>
+
+          {/* 4 Interactive Category Tabs */}
+          <div className="flex items-center gap-1.5 p-1 bg-surface-100 rounded-xl border border-surface-200 text-xs overflow-x-auto">
+            <button
+              onClick={() => setFilterTab('all')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg font-bold transition-all whitespace-nowrap',
+                filterTab === 'all' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-600 hover:text-surface-900'
+              )}
+            >
+              All ({userOrders.length})
+            </button>
+            <button
+              onClick={() => setFilterTab('waiting')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5',
+                filterTab === 'waiting' ? 'bg-white text-amber-900 shadow-sm' : 'text-surface-600 hover:text-amber-800'
+              )}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              Waiting ({waitingOrders.length})
+            </button>
+            <button
+              onClick={() => setFilterTab('approved')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5',
+                filterTab === 'approved' ? 'bg-white text-emerald-900 shadow-sm' : 'text-surface-600 hover:text-emerald-800'
+              )}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-600" />
+              Approved ({approvedOrders.length})
+            </button>
+            <button
+              onClick={() => setFilterTab('played')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg font-bold transition-all whitespace-nowrap',
+                filterTab === 'played' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-600 hover:text-surface-900'
+              )}
+            >
+              Played Earlier ({playedOrders.length})
+            </button>
+          </div>
         </div>
 
-        {userOrders.length === 0 ? (
+        {displayedOrders.length === 0 ? (
           <div className="bg-white rounded-2xl border border-surface-200 p-12 text-center space-y-4">
             <Calendar className="w-10 h-10 text-surface-300 mx-auto" />
-            <h3 className="text-base font-bold text-surface-900">No Reservations Found</h3>
+            <h3 className="text-base font-bold text-surface-900">No Reservations In This View</h3>
             <p className="text-xs text-surface-500 max-w-sm mx-auto">
-              You haven't requested any futsal slots yet. Browse available dates and reserve an hour.
+              {filterTab === 'all'
+                ? "You haven't requested any futsal slots yet. Browse available dates and reserve an hour."
+                : `You currently have 0 orders in "${filterTab}". Switch tabs above or book a new slot.`}
             </p>
             <div className="pt-2">
               <Link to="/book">
@@ -117,7 +184,7 @@ export const CustomerBookingsPage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {userOrders.map((order) => {
+            {displayedOrders.map((order: BookingOrder) => {
               const isConfirmed = order.status === 'confirmed';
               const isPending = order.status === 'pending';
               const isRejected = order.status === 'rejected';

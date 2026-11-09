@@ -9,6 +9,15 @@ import { cn } from '@/lib/utils';
 const FootballAnimation: React.FC<{ isHovered: boolean }> = ({ isHovered }) => {
   return (
     <div className="relative w-full h-44 flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-emerald-950/5 via-emerald-900/10 to-emerald-800/15 border border-emerald-100/80">
+      {/* Live Pulsating Radar Waves */}
+      <div className="absolute w-44 h-44 rounded-full border-2 border-emerald-400/25 animate-ping opacity-60 pointer-events-none" style={{ animationDuration: '3.2s' }} />
+      <div className="absolute w-32 h-32 rounded-full border border-emerald-500/35 animate-ping opacity-75 delay-300 pointer-events-none" style={{ animationDuration: '2.5s' }} />
+
+      {/* Orbiting Radar Scanner Light */}
+      <div className="absolute w-36 h-36 rounded-full border border-emerald-500/40 animate-spin pointer-events-none" style={{ animationDuration: '5.5s' }}>
+        <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_12px_#10b981] -translate-y-1.5 mx-auto" />
+      </div>
+
       {/* Background futsal field lines (subtle pitch) */}
       <svg className="absolute inset-0 w-full h-full opacity-30 pointer-events-none" viewBox="0 0 400 180" preserveAspectRatio="none">
         <line x1="20" y1="90" x2="380" y2="90" stroke="#059669" strokeWidth="1.5" strokeDasharray="4 4" />
@@ -107,6 +116,15 @@ const FootballAnimation: React.FC<{ isHovered: boolean }> = ({ isHovered }) => {
 const CricketAnimation: React.FC<{ isHovered: boolean }> = ({ isHovered }) => {
   return (
     <div className="relative w-full h-44 flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-amber-950/5 via-amber-900/10 to-amber-800/15 border border-amber-200/80">
+      {/* Live Pulsating Radar Waves */}
+      <div className="absolute w-44 h-44 rounded-full border-2 border-red-500/25 animate-ping opacity-60 pointer-events-none" style={{ animationDuration: '3.2s' }} />
+      <div className="absolute w-32 h-32 rounded-full border border-amber-500/35 animate-ping opacity-75 delay-300 pointer-events-none" style={{ animationDuration: '2.5s' }} />
+
+      {/* Orbiting Radar Scanner Light */}
+      <div className="absolute w-36 h-36 rounded-full border border-amber-500/40 animate-spin pointer-events-none" style={{ animationDuration: '5.5s' }}>
+        <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_12px_#ef4444] -translate-y-1.5 mx-auto" />
+      </div>
+
       {/* Background Pitch Crease & Stumps */}
       <svg className="absolute inset-0 w-full h-full opacity-35 pointer-events-none" viewBox="0 0 400 180">
         {/* Pitch boundary rectangle */}

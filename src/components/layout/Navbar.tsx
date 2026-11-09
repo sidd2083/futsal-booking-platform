@@ -13,6 +13,7 @@ import {
   Shield,
   LogOut,
   CheckCircle,
+  Clock,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -79,6 +80,18 @@ export const Navbar: React.FC = () => {
 
             {/* Right Action Suite */}
             <div className="hidden sm:flex items-center gap-3">
+              {/* Order History Link */}
+              <Link to="/customer/bookings">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="font-bold border-surface-300 text-surface-800 hover:bg-surface-100"
+                  leftIcon={<Clock className="w-3.5 h-3.5 text-emerald-700" />}
+                >
+                  Order History
+                </Button>
+              </Link>
+
               {/* Primary Book CTA */}
               <Link to="/book">
                 <Button

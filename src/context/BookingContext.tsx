@@ -102,7 +102,16 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
               ...data,
             } as BookingOrder);
           });
-          setOrders(fetched);
+          setOrders((prev) => {
+            const map = new Map<string, BookingOrder>();
+            // Keep local orders to avoid flickering
+            prev.forEach((o) => map.set(o.id, o));
+            // Apply fresh remote updates
+            fetched.forEach((o) => map.set(o.id, o));
+            return Array.from(map.values()).sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+          });
           setIsLoading(false);
         },
         (err) => {
@@ -288,10 +297,10 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             error: err.message || 'Slot reservation failed. Please refresh availability.',
           };
         }
-      } else {
-        setOrders((prev) => [newOrder, ...prev]);
       }
 
+      // Always update local state immediately so user sees it instantly
+      setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
       return { success: true, order: newOrder };
     },
     [user, orders, pricing]
@@ -335,21 +344,22 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } catch (err: any) {
           return { success: false, error: err.message };
         }
-      } else {
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.id === orderId
-              ? {
-                  ...o,
-                  status: 'confirmed',
-                  bookingCode: code,
-                  confirmedAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                }
-              : o
-          )
-        );
       }
+
+      // Always update local state immediately
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                status: 'confirmed',
+                bookingCode: code,
+                confirmedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
+            : o
+        )
+      );
       return { success: true };
     },
     [selectedSport]
@@ -384,21 +394,22 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } catch (err: any) {
           return { success: false, error: err.message };
         }
-      } else {
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.id === orderId
-              ? {
-                  ...o,
-                  status: 'rejected',
-                  rejectionReason: reason || 'Declined by venue manager',
-                  rejectedAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                }
-              : o
-          )
-        );
       }
+
+      // Always update local state immediately
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                status: 'rejected',
+                rejectionReason: reason || 'Declined by venue manager',
+                rejectedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
+            : o
+        )
+      );
       return { success: true };
     },
     []
@@ -437,7 +448,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isSaturday: isSat,
         paymentMethod: 'pay_on_arrival',
         paymentStatus: 'received',
-        userId: 'admin_counter',
+        userId: user ? user.uid : 'admin_counter',
         customerName: params.customerName,
         customerPhone: params.customerPhone,
         isManualBooking: true,
@@ -484,13 +495,13 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         } catch (err: any) {
           return { success: false, error: err.message };
         }
-      } else {
-        setOrders((prev) => [manualOrder, ...prev]);
       }
 
+      // Always update local state immediately
+      setOrders((prev) => [manualOrder, ...prev.filter((o) => o.id !== manualOrder.id)]);
       return { success: true, order: manualOrder };
     },
-    [pricing]
+    [user, pricing]
   );
 
   // Revenue metrics strictly computed from confirmed orders
