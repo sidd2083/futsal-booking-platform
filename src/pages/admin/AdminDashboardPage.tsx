@@ -40,7 +40,7 @@ import { cn } from '@/lib/utils';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 const AdminDashboardInner: React.FC = () => {
-  const { user, isAdmin, loginWithEmailPassword, logout } = useAuth();
+  const { user, isAdmin, loginWithEmailPassword, logout, recheckAdmin } = useAuth();
   const {
     orders,
     pendingOrders,
@@ -66,6 +66,8 @@ const AdminDashboardInner: React.FC = () => {
   const [adminPassword, setAdminPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [recheckingAdmin, setRecheckingAdmin] = useState(false);
+  const [recheckNotice, setRecheckNotice] = useState<string | null>(null);
 
   // Active Sidebar View
   const [activeView, setActiveView] = useState<
@@ -142,10 +144,18 @@ const AdminDashboardInner: React.FC = () => {
     setLoginError(null);
     setLoginLoading(true);
     const res = await loginWithEmailPassword(adminEmail, adminPassword);
-    setLoginLoading(false);
 
     if (!res.success) {
+      setLoginLoading(false);
       setLoginError(res.error || 'Invalid administrator credentials.');
+      return;
+    }
+
+    // Immediately verify admin role across all Firebase collections
+    const isNowAdmin = await recheckAdmin();
+    setLoginLoading(false);
+    if (!isNowAdmin) {
+      setLoginError(`Signed in as ${adminEmail}, but this account is not registered as an administrator in Firestore yet.`);
     }
   };
 
@@ -414,17 +424,54 @@ const AdminDashboardInner: React.FC = () => {
           </form>
 
           {user && !isAdmin && (
-            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-2">
-              <p className="font-bold flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 text-amber-700" />
-                Account Signed In as Customer:
-              </p>
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 space-y-3">
+              <div className="flex items-center gap-2 font-bold text-amber-950">
+                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                <span>Account Signed In as Customer:</span>
+              </div>
               <p className="text-[11px] leading-relaxed">
-                You are currently signed in as <strong>{user.email}</strong>. This email has not yet been registered in the <code>/adminUsers</code> collection in Firestore.
+                You are currently signed in as <strong>{user.email}</strong>.
               </p>
-              <Button size="sm" variant="outline" className="w-full bg-white font-bold" onClick={logout}>
-                Log Out &amp; Switch Account
-              </Button>
+              <p className="text-[11px] text-amber-800">
+                Your Account UID: <code className="bg-white px-1.5 py-0.5 rounded border border-amber-300 font-mono font-bold text-[10px] select-all">{user.uid}</code>
+              </p>
+              <p className="text-[11px] text-amber-800 leading-snug">
+                If you set this email or UID in Firestore (under collection <code>adminUsers</code>, <code>admins</code>, or set <code>role: "admin"</code> in <code>users</code>), click below to verify:
+              </p>
+
+              {recheckNotice && (
+                <div className="p-2.5 bg-white border border-amber-300 rounded-xl text-amber-900 text-[11px] font-bold">
+                  {recheckNotice}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="bg-emerald-700 hover:bg-emerald-800 font-black flex-1"
+                  onClick={async () => {
+                    setRecheckingAdmin(true);
+                    setRecheckNotice(null);
+                    const found = await recheckAdmin();
+                    setRecheckingAdmin(false);
+                    if (!found) {
+                      setRecheckNotice(`Checked Firestore for "${user.email}" and UID "${user.uid}". No admin record found yet. Please make sure a document exists in "adminUsers" or "admins" with your email or UID.`);
+                    }
+                  }}
+                  isLoading={recheckingAdmin}
+                >
+                  Verify Admin Access Now
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-white font-bold"
+                  onClick={logout}
+                >
+                  Log Out / Switch
+                </Button>
+              </div>
             </div>
           )}
         </div>

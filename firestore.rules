@@ -48,6 +48,10 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
+    match /admin/{adminId} {
+      allow read, write: if isAuthenticated();
+    }
+
     // Audit logs:
     match /audit_logs/{logId} {
       allow read, write: if isAuthenticated();

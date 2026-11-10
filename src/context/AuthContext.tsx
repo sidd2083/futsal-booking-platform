@@ -15,6 +15,10 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
 } from 'firebase/firestore';
 
 interface AuthContextType {
@@ -38,6 +42,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (data: { fullName: string; phoneNumber: string }) => Promise<{ success: boolean; error?: string }>;
   dismissProfileCompletion: () => void;
+  recheckAdmin: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -71,23 +76,114 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(false);
   const [needsProfileCompletion, setNeedsProfileCompletion] = useState<boolean>(false);
 
-  // Fast, non-blocking admin role check
-  const checkAdminRole = useCallback(async (uid: string, email?: string | null): Promise<boolean> => {
-    if (!db) return false;
+  // Exhaustive & resilient admin role check
+  const checkAdminRole = useCallback(async (uid: string, rawEmail?: string | null): Promise<boolean> => {
+    const firestore = db;
+    if (!firestore) return false;
     try {
-      const cleanEmail = email?.trim().toLowerCase();
-      const checks: Promise<any>[] = [
-        getDoc(doc(db, 'adminUsers', uid)),
-        getDoc(doc(db, 'admins', uid)),
+      const email = rawEmail?.trim() || '';
+      const cleanEmail = email.toLowerCase();
+
+      // 1. Direct document lookups (UID or Email as Document ID)
+      const directDocPaths = [
+        `adminUsers/${uid}`,
+        `admins/${uid}`,
+        `admin/${uid}`,
+        `users/${uid}`,
       ];
+
       if (cleanEmail) {
-        checks.push(getDoc(doc(db, 'adminUsers', cleanEmail)));
+        directDocPaths.push(`adminUsers/${cleanEmail}`);
+        directDocPaths.push(`admins/${cleanEmail}`);
+        directDocPaths.push(`admin/${cleanEmail}`);
+        if (email !== cleanEmail) {
+          directDocPaths.push(`adminUsers/${email}`);
+          directDocPaths.push(`admins/${email}`);
+        }
       }
 
-      // Fast 1.2-second timeout protection so auth never delays
-      const timeout = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 1200));
-      const snaps = await Promise.race([Promise.all(checks), timeout]);
-      return snaps.some((s) => s && typeof s.exists === 'function' && s.exists());
+      const directChecks = directDocPaths.map(async (path) => {
+        try {
+          const parts = path.split('/');
+          const snap = await getDoc(doc(firestore, parts[0], parts[1]));
+          if (!snap.exists()) return false;
+          const data = snap.data();
+          if (parts[0] === 'users') {
+            const role = (data?.role || '').toString().toLowerCase();
+            return role === 'admin' || data?.isAdmin === true || data?.admin === true;
+          }
+          // In adminUsers / admins / admin collections:
+          return true;
+        } catch {
+          return false;
+        }
+      });
+
+      // 2. Query lookups (in case document ID is auto-generated or email field is stored)
+      const queryChecks: Promise<boolean>[] = [];
+      if (cleanEmail) {
+        queryChecks.push(
+          (async () => {
+            try {
+              const q1 = query(collection(firestore, 'adminUsers'), where('email', '==', cleanEmail));
+              const s1 = await getDocs(q1);
+              if (!s1.empty) return true;
+              if (email !== cleanEmail) {
+                const q1b = query(collection(firestore, 'adminUsers'), where('email', '==', email));
+                const s1b = await getDocs(q1b);
+                if (!s1b.empty) return true;
+              }
+              return false;
+            } catch {
+              return false;
+            }
+          })(),
+          (async () => {
+            try {
+              const q2 = query(collection(firestore, 'admins'), where('email', '==', cleanEmail));
+              const s2 = await getDocs(q2);
+              if (!s2.empty) return true;
+              return false;
+            } catch {
+              return false;
+            }
+          })(),
+          (async () => {
+            try {
+              const q3 = query(collection(firestore, 'users'), where('email', '==', cleanEmail));
+              const s3 = await getDocs(q3);
+              for (const docSnap of s3.docs) {
+                const d = docSnap.data();
+                const r = (d?.role || '').toString().toLowerCase();
+                if (r === 'admin' || d?.isAdmin === true || d?.admin === true) {
+                  return true;
+                }
+              }
+              return false;
+            } catch {
+              return false;
+            }
+          })()
+        );
+      }
+
+      // Check uid in adminUsers by query
+      queryChecks.push(
+        (async () => {
+          try {
+            const qu = query(collection(firestore, 'adminUsers'), where('uid', '==', uid));
+            const su = await getDocs(qu);
+            return !su.empty;
+          } catch {
+            return false;
+          }
+        })()
+      );
+
+      const allChecks = [...directChecks, ...queryChecks];
+      const timeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000));
+      const anyMatch = Promise.all(allChecks).then((results) => results.some(Boolean));
+      return await Promise.race([anyMatch, timeout]);
     } catch (err) {
       console.warn('Admin check warning:', err);
       return false;
@@ -119,10 +215,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         const userRef = doc(db, 'users', fbUser.uid);
-        const snap = await getDoc(userRef);
+        const [snap, adminStatus] = await Promise.all([
+          getDoc(userRef),
+          checkAdminRole(fbUser.uid, fbUser.email),
+        ]);
 
-        const adminStatus = await checkAdminRole(fbUser.uid, fbUser.email);
-        setIsAdmin(adminStatus);
+        const snapIsAdmin = snap.exists() && (
+          (snap.data()?.role || '').toString().toLowerCase() === 'admin' ||
+          snap.data()?.isAdmin === true ||
+          snap.data()?.admin === true
+        );
+        const finalAdmin = adminStatus || snapIsAdmin;
+        setIsAdmin(finalAdmin);
 
         if (snap.exists()) {
           const profileData = snap.data() as UserProfile;
@@ -132,7 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email: profileData.email || fbUser.email || '',
             phoneNumber: profileData.phoneNumber || fbUser.phoneNumber || '',
             photoURL: profileData.photoURL || fbUser.photoURL || '',
-            role: adminStatus ? 'admin' : (profileData.role || 'customer'),
+            role: finalAdmin ? 'admin' : (profileData.role || 'customer'),
           };
           setUser(merged);
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
@@ -152,7 +256,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             phoneNumber: fbUser.phoneNumber || '',
             authProvider: providerType,
             photoURL: fbUser.photoURL || '',
-            role: adminStatus ? 'admin' : 'customer',
+            role: finalAdmin ? 'admin' : 'customer',
             createdAt: nowIso,
             updatedAt: nowIso,
           };
@@ -174,13 +278,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error('Error synchronizing Firestore user profile:', error);
-        // Fallback to auth identity if Firestore times out
         setUser(fallbackProfile);
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(fallbackProfile));
       }
     },
     [checkAdminRole]
   );
+
+  // Recheck admin status on demand
+  const recheckAdmin = useCallback(async (): Promise<boolean> => {
+    if (!user) return false;
+    const isNowAdmin = await checkAdminRole(user.uid, user.email);
+    if (isNowAdmin) {
+      setIsAdmin(true);
+      const updated = { ...user, role: 'admin' as const };
+      setUser(updated);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+    }
+    return isNowAdmin;
+  }, [user, checkAdminRole]);
 
   useEffect(() => {
     if (isFirebaseConfigured && auth) {
@@ -499,6 +615,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         updateProfile,
         dismissProfileCompletion,
+        recheckAdmin,
       }}
     >
       {children}
