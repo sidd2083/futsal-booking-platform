@@ -37,6 +37,10 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
             <span className="text-surface-700 font-medium">Booked</span>
           </div>
           <div className="flex items-center gap-1.5">
+            <div className="w-3.5 h-3.5 rounded-md bg-purple-900 border border-purple-800 shadow-sm" />
+            <span className="text-surface-700 font-medium">Holiday / Closed</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <div className="w-3.5 h-3.5 rounded-md bg-emerald-600 border border-emerald-700 shadow-sm" />
             <span className="text-surface-700 font-medium">Your Confirmed Match</span>
           </div>
@@ -74,7 +78,13 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
           let statusText = '';
           let isClickable = false;
 
-          if (isPastSlot) {
+          if (slot.closureReason) {
+            // PURPLE: Court closed by admin (Holiday / Tournament / Maintenance)
+            cardStyle =
+              'bg-purple-900 text-purple-100 border-purple-800 shadow-sm cursor-not-allowed';
+            statusText = `Closed: ${slot.closureReason}`;
+            isClickable = false;
+          } else if (isPastSlot) {
             // GREY: Time has passed — cannot book
             cardStyle =
               'bg-surface-100 text-surface-400 border-surface-200 opacity-60 cursor-not-allowed';
@@ -134,7 +144,8 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
                   {formatSlotTime(slot.startTime, slot.endTime)}
                 </span>
 
-                {isPastSlot && <Ban className="w-3.5 h-3.5 shrink-0 text-surface-400" />}
+                {slot.closureReason && <Lock className="w-3.5 h-3.5 shrink-0 text-purple-300" />}
+                {!slot.closureReason && isPastSlot && <Ban className="w-3.5 h-3.5 shrink-0 text-surface-400" />}
                 {isUserConfirmed && <Check className="w-4 h-4 shrink-0 text-white" />}
                 {isOtherConfirmed && <Lock className="w-3.5 h-3.5 shrink-0 text-white/90" />}
                 {isOtherPending && <Clock className="w-3.5 h-3.5 shrink-0 text-white/90" />}

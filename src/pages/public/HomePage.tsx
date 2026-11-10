@@ -44,7 +44,7 @@ export const HomePage: React.FC = () => {
 
           {/* Headline */}
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-surface-900 max-w-4xl mx-auto leading-[1.08]">
-            Hetauda's Premier Match Ground.{' '}
+            Hetauda's Premier Futsal Ground.{' '}
             <span className="text-emerald-700 block sm:inline">Ready When You Are.</span>
           </h1>
 

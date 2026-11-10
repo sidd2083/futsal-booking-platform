@@ -39,6 +39,25 @@ export interface CourtSlot {
   customerName?: string;
   customerPhone?: string;
   isSaturday: boolean;
+  closureReason?: string;
+}
+
+export interface CourtClosure {
+  id: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  reason: string; // "Festival Holiday", "Turf Maintenance"
+  createdAt?: string;
+}
+
+export interface SiteAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  active: boolean;
+  date?: string;
+  updatedAt?: string;
 }
 
 export interface BookingOrder {

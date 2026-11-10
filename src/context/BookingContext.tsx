@@ -6,6 +6,8 @@ import {
   RevenueMetrics,
   SportType,
   PaymentMethod,
+  CourtClosure,
+  SiteAnnouncement,
 } from '@/types';
 import { DEFAULT_PRICING, BUSINESS_INFO } from '@/lib/constants';
 import {
@@ -30,6 +32,12 @@ import {
 
 interface BookingContextType {
   pricing: PricingConfig;
+  updatePricing: (newPricing: { normalDayRate: number; saturdayRate: number }) => Promise<{ success: boolean; error?: string }>;
+  closures: CourtClosure[];
+  addClosure: (closure: { date: string; startTime: string; endTime: string; reason: string }) => Promise<{ success: boolean; error?: string }>;
+  removeClosure: (closureId: string) => Promise<{ success: boolean; error?: string }>;
+  announcement: SiteAnnouncement | null;
+  updateAnnouncement: (announcement: { title: string; message: string; active: boolean }) => Promise<{ success: boolean; error?: string }>;
   selectedSport: SportType;
   setSelectedSport: (sport: SportType) => void;
   selectedDate: string; // YYYY-MM-DD
@@ -61,6 +69,9 @@ interface BookingContextType {
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
 
 const BOOKINGS_STORAGE_KEY = 'maya_local_booking_orders';
+const PRICING_STORAGE_KEY = 'maya_local_pricing';
+const CLOSURES_STORAGE_KEY = 'maya_local_closures';
+const ANNOUNCEMENT_STORAGE_KEY = 'maya_local_announcement';
 
 export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -69,7 +80,36 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Nepal local date today
   const nepalToday = useMemo(() => getNepalTodayFormatted(), []);
   const [selectedDate, setSelectedDate] = useState<string>(nepalToday);
-  const [pricing] = useState<PricingConfig>(DEFAULT_PRICING);
+
+  // Dynamic Pricing State (synced with Firestore settings/pricing)
+  const [pricing, setPricing] = useState<PricingConfig>(() => {
+    try {
+      const saved = localStorage.getItem(PRICING_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : DEFAULT_PRICING;
+    } catch {
+      return DEFAULT_PRICING;
+    }
+  });
+
+  // Court Closures / Holiday Breaks (synced with Firestore courtClosures)
+  const [closures, setClosures] = useState<CourtClosure[]>(() => {
+    try {
+      const saved = localStorage.getItem(CLOSURES_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Global Announcement (synced with Firestore settings/announcement)
+  const [announcement, setAnnouncement] = useState<SiteAnnouncement | null>(() => {
+    try {
+      const saved = localStorage.getItem(ANNOUNCEMENT_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const [orders, setOrders] = useState<BookingOrder[]>(() => {
     const saved = localStorage.getItem(BOOKINGS_STORAGE_KEY);
@@ -85,10 +125,68 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Sync to local storage
+  // Sync orders to local storage
   useEffect(() => {
     localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(orders));
   }, [orders]);
+
+  // Sync pricing, closures, and announcement listeners from Firestore
+  useEffect(() => {
+    if (isFirebaseConfigured && db) {
+      // 1. Pricing listener
+      const unsubPricing = onSnapshot(doc(db, 'settings', 'pricing'), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setPricing((prev) => {
+            const next: PricingConfig = {
+              ...prev,
+              normalDayRate: Number(data.normalDayRate) || prev.normalDayRate,
+              saturdayRate: Number(data.saturdayRate) || prev.saturdayRate,
+            };
+            try {
+              localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify(next));
+            } catch (e) {
+              console.warn('Storage notice:', e);
+            }
+            return next;
+          });
+        }
+      });
+
+      // 2. Court Closures listener
+      const unsubClosures = onSnapshot(collection(db, 'courtClosures'), (snap) => {
+        const fetchedClosures: CourtClosure[] = [];
+        snap.forEach((docSnap) => {
+          fetchedClosures.push({ id: docSnap.id, ...docSnap.data() } as CourtClosure);
+        });
+        setClosures(fetchedClosures);
+        try {
+          localStorage.setItem(CLOSURES_STORAGE_KEY, JSON.stringify(fetchedClosures));
+        } catch (e) {
+          console.warn('Storage notice:', e);
+        }
+      });
+
+      // 3. Announcement listener
+      const unsubAnnouncement = onSnapshot(doc(db, 'settings', 'announcement'), (snap) => {
+        if (snap.exists()) {
+          const data = { id: snap.id, ...snap.data() } as SiteAnnouncement;
+          setAnnouncement(data);
+          try {
+            localStorage.setItem(ANNOUNCEMENT_STORAGE_KEY, JSON.stringify(data));
+          } catch (e) {
+            console.warn('Storage notice:', e);
+          }
+        }
+      });
+
+      return () => {
+        unsubPricing();
+        unsubClosures();
+        unsubAnnouncement();
+      };
+    }
+  }, []);
 
   // Firestore live listener on bookings collection
   useEffect(() => {
@@ -167,6 +265,31 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     for (const def of slotDefinitions) {
       const hourPart = def.startTime.split(':')[0];
       const slotKey = `${selectedSport}_court1_${selectedDate}_${hourPart}`;
+
+      // Check if slot falls in a court closure / holiday / maintenance break
+      const closureMatch = closures.find(
+        (c) =>
+          c.date === selectedDate &&
+          def.startTime >= c.startTime &&
+          def.startTime < c.endTime
+      );
+
+      if (closureMatch) {
+        generated.push({
+          slotId: slotKey,
+          sport: selectedSport,
+          courtId: 'court1',
+          date: selectedDate,
+          startTime: def.startTime,
+          endTime: def.endTime,
+          status: 'disabled',
+          price,
+          isSaturday: isSat,
+          closureReason: closureMatch.reason || 'Court Closed / Holiday Break',
+        });
+        continue;
+      }
+
       const match = activeOrdersOnDate.find((o) => o.startTime === def.startTime);
 
       if (match) {
@@ -203,7 +326,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     return generated;
-  }, [selectedDate, selectedSport, orders, pricing, slotDefinitions]);
+  }, [selectedDate, selectedSport, orders, pricing, slotDefinitions, closures]);
 
   // Request a slot booking (Pay on Arrival or Pay Online workflow with Firestore Transaction)
   const requestSlotBooking = useCallback(
@@ -241,6 +364,20 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return {
           success: false,
           error: 'This playing hour has already passed in Nepal time. Please pick an upcoming slot.',
+        };
+      }
+
+      // Check if slot falls in a court closure / holiday break
+      const closureMatch = closures.find(
+        (c) =>
+          c.date === slot.date &&
+          slot.startTime >= c.startTime &&
+          slot.startTime < c.endTime
+      );
+      if (closureMatch) {
+        return {
+          success: false,
+          error: `Court is closed for this hour: ${closureMatch.reason || 'Holiday / Maintenance Break'}.`,
         };
       }
 
@@ -354,7 +491,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       return { success: true, order: newOrder };
     },
-    [user, orders, pricing]
+    [user, orders, pricing, closures]
   );
 
   // Admin approves a pending booking
@@ -557,7 +694,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isSaturday: isSat,
         paymentMethod: 'pay_on_arrival',
         paymentStatus: 'received',
-        userId: user ? user.uid : 'admin_counter',
+        userId: 'admin_counter_desk',
         customerName: params.customerName,
         customerPhone: params.customerPhone,
         isManualBooking: true,
@@ -605,7 +742,105 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setOrders((prev) => [manualOrder, ...prev.filter((o) => o.id !== manualOrder.id)]);
       return { success: true, order: manualOrder };
     },
-    [user, pricing]
+    [pricing]
+  );
+
+  // Dynamic Pricing Update Handler (Admin)
+  const updatePricing = useCallback(
+    async (newRates: { normalDayRate: number; saturdayRate: number }) => {
+      const updated: PricingConfig = {
+        ...pricing,
+        normalDayRate: Number(newRates.normalDayRate) || pricing.normalDayRate,
+        saturdayRate: Number(newRates.saturdayRate) || pricing.saturdayRate,
+      };
+      setPricing(updated);
+      try {
+        localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Storage notice:', e);
+      }
+
+      if (isFirebaseConfigured && db) {
+        try {
+          await setDoc(doc(db, 'settings', 'pricing'), updated, { merge: true });
+        } catch (err: any) {
+          console.warn('Firestore pricing sync notice:', err);
+        }
+      }
+      return { success: true };
+    },
+    [pricing]
+  );
+
+  // Court Closure / Holiday Break Add Handler (Admin)
+  const addClosure = useCallback(
+    async (closureData: { date: string; startTime: string; endTime: string; reason: string }) => {
+      const newClosure: CourtClosure = {
+        id: `closure-${Date.now()}`,
+        ...closureData,
+        createdAt: new Date().toISOString(),
+      };
+      setClosures((prev) => [newClosure, ...prev]);
+
+      if (isFirebaseConfigured && db) {
+        try {
+          const docRef = doc(collection(db, 'courtClosures'));
+          newClosure.id = docRef.id;
+          await setDoc(docRef, newClosure);
+        } catch (err: any) {
+          console.warn('Firestore closure sync notice:', err);
+        }
+      }
+      return { success: true };
+    },
+    []
+  );
+
+  // Court Closure Remove Handler (Admin)
+  const removeClosure = useCallback(
+    async (closureId: string) => {
+      setClosures((prev) => prev.filter((c) => c.id !== closureId));
+
+      if (isFirebaseConfigured && db) {
+        try {
+          await deleteDoc(doc(db, 'courtClosures', closureId));
+        } catch (err: any) {
+          console.warn('Firestore delete closure notice:', err);
+        }
+      }
+      return { success: true };
+    },
+    []
+  );
+
+  // Global Announcement Update Handler (Admin)
+  const updateAnnouncement = useCallback(
+    async (data: { title: string; message: string; active: boolean }) => {
+      const updated: SiteAnnouncement = {
+        id: `announcement-${Date.now()}`,
+        title: data.title,
+        message: data.message,
+        active: data.active,
+        date: getNepalTodayFormatted(),
+        updatedAt: new Date().toISOString(),
+      };
+      setAnnouncement(updated);
+      try {
+        localStorage.setItem(ANNOUNCEMENT_STORAGE_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Storage notice:', e);
+      }
+
+      if (isFirebaseConfigured && db) {
+        try {
+          await setDoc(doc(db, 'settings', 'announcement'), updated, { merge: true });
+        } catch (err: any) {
+          console.warn('Firestore announcement sync notice:', err);
+        }
+      }
+      return { success: true };
+    },
+    []
   );
 
   // Revenue metrics strictly computed from confirmed orders
@@ -631,7 +866,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const uniqueCustomers = new Set<string>();
 
     orders.forEach((o) => {
-      if (o.userId && o.userId !== 'admin_counter') {
+      if (o.userId && o.userId !== 'admin_counter' && o.userId !== 'admin_counter_desk') {
         uniqueCustomers.add(o.userId);
       } else if (o.customerPhone) {
         uniqueCustomers.add(o.customerPhone);
@@ -676,11 +911,11 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [orders]
   );
 
-  // Auto-prune order history: customer sees ONLY latest 7 orders; older orders are pruned
+  // Auto-prune order history: customer sees ONLY their own actual bookings; manual counter bookings are excluded!
   const userOrders = useMemo(() => {
     if (!user) return [];
     return orders
-      .filter((o) => o.userId === user.uid)
+      .filter((o) => o.userId === user.uid && !o.isManualBooking && o.userId !== 'admin_counter' && o.userId !== 'admin_counter_desk')
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
       .slice(0, 7);
   }, [orders, user]);
@@ -689,13 +924,13 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     if (!user) return;
     const userAll = orders
-      .filter((o) => o.userId === user.uid)
+      .filter((o) => o.userId === user.uid && !o.isManualBooking && o.userId !== 'admin_counter' && o.userId !== 'admin_counter_desk')
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
     if (userAll.length > 7) {
       const keepIds = new Set(userAll.slice(0, 7).map((o) => o.id));
       setOrders((prev) =>
-        prev.filter((o) => o.userId !== user.uid || keepIds.has(o.id))
+        prev.filter((o) => (o.userId !== user.uid || o.isManualBooking) || keepIds.has(o.id))
       );
     }
   }, [user, orders]);
@@ -704,6 +939,12 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     <BookingContext.Provider
       value={{
         pricing,
+        updatePricing,
+        closures,
+        addClosure,
+        removeClosure,
+        announcement,
+        updateAnnouncement,
         selectedSport,
         setSelectedSport,
         selectedDate,

@@ -8,6 +8,7 @@ import { Footer } from '@/components/layout/Footer';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { ScrollToTop } from '@/components/common/ScrollToTop';
+import { AnnouncementModal } from '@/components/common/AnnouncementModal';
 
 // Immediate Load
 import { HomePage } from '@/pages/public/HomePage';
@@ -43,6 +44,7 @@ export const App: React.FC = () => {
         <PWAProvider>
           <BrowserRouter>
             <ScrollToTop />
+            <AnnouncementModal />
             <div className="flex flex-col min-h-screen bg-white">
               <Navbar />
               <main className="flex-1 w-full min-w-0 pb-16 md:pb-0">

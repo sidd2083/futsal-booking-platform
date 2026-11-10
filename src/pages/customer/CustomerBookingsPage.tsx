@@ -7,6 +7,7 @@ import { BookingOrder } from '@/types';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { AuthModal } from '@/components/common/AuthModal';
+import { AnnouncementModal } from '@/components/common/AnnouncementModal';
 import {
   Calendar,
   Clock,
@@ -16,6 +17,7 @@ import {
   User,
   ArrowRight,
   Phone,
+  Bell,
 } from 'lucide-react';
 
 export const CustomerBookingsPage: React.FC = () => {
@@ -23,6 +25,7 @@ export const CustomerBookingsPage: React.FC = () => {
   const { userOrders } = useBooking();
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [noticeModalOpen, setNoticeModalOpen] = useState(false);
   const [filterTab, setFilterTab] = useState<'all' | 'waiting' | 'approved' | 'played'>('all');
 
   const nepalToday = useMemo(() => getNepalTodayFormatted(), []);
@@ -103,12 +106,29 @@ export const CustomerBookingsPage: React.FC = () => {
           </div>
         </div>
 
-        <Link to="/book">
-          <Button variant="primary" size="md" className="bg-emerald-700 hover:bg-emerald-800 font-bold" rightIcon={<ArrowRight className="w-4 h-4" />}>
-            Book Another Slot
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="md"
+            className="font-bold border-surface-300 text-surface-700 bg-white"
+            onClick={() => setNoticeModalOpen(true)}
+            leftIcon={<Bell className="w-4 h-4 text-emerald-700" />}
+          >
+            Venue Notices
           </Button>
-        </Link>
+
+          <Link to="/book">
+            <Button variant="primary" size="md" className="bg-emerald-700 hover:bg-emerald-800 font-bold" rightIcon={<ArrowRight className="w-4 h-4" />}>
+              Book Another Slot
+            </Button>
+          </Link>
+        </div>
       </div>
+
+      <AnnouncementModal
+        isOpen={noticeModalOpen}
+        onClose={() => setNoticeModalOpen(false)}
+      />
 
       {/* Bookings List */}
       <div className="space-y-4">

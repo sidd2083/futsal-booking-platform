@@ -31,6 +31,10 @@ import {
   Copy,
   Sparkles,
   Trash2,
+  Megaphone,
+  Coins,
+  Ban,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -48,6 +52,13 @@ const AdminDashboardInner: React.FC = () => {
     adminRejectBooking,
     adminCancelBooking,
     adminCreateManualBooking,
+    pricing,
+    updatePricing,
+    closures,
+    addClosure,
+    removeClosure,
+    announcement,
+    updateAnnouncement,
   } = useBooking();
 
   // Admin login screen state
@@ -58,7 +69,7 @@ const AdminDashboardInner: React.FC = () => {
 
   // Active Sidebar View
   const [activeView, setActiveView] = useState<
-    'overview' | 'approvals' | 'courts' | 'manual' | 'orders' | 'revenue' | 'customers'
+    'overview' | 'approvals' | 'courts' | 'manual' | 'orders' | 'revenue' | 'customers' | 'pricing' | 'closures' | 'announcements'
   >('approvals');
 
   // Search & filter state
@@ -98,6 +109,27 @@ const AdminDashboardInner: React.FC = () => {
     code?: string;
   } | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+
+  // ─── PRICING MANAGER STATE ───
+  const [pricingNormalRate, setPricingNormalRate] = useState(() => pricing.normalDayRate);
+  const [pricingSatRate, setPricingSatRate] = useState(() => pricing.saturdayRate);
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const [pricingSuccessMsg, setPricingSuccessMsg] = useState('');
+
+  // ─── COURT CLOSURES STATE ───
+  const [closureDate, setClosureDate] = useState(() => getNepalTodayFormatted());
+  const [closureStartTime, setClosureStartTime] = useState('10:00');
+  const [closureEndTime, setClosureEndTime] = useState('21:00');
+  const [closureReason, setClosureReason] = useState('');
+  const [closureSaving, setClosureSaving] = useState(false);
+  const [closureSuccessMsg, setClosureSuccessMsg] = useState('');
+
+  // ─── ANNOUNCEMENTS STATE ───
+  const [annTitle, setAnnTitle] = useState(() => announcement?.title || '');
+  const [annMessage, setAnnMessage] = useState(() => announcement?.message || '');
+  const [annActive, setAnnActive] = useState(() => announcement?.active ?? false);
+  const [annSaving, setAnnSaving] = useState(false);
+  const [annSuccessMsg, setAnnSuccessMsg] = useState('');
 
   // Hourly slots (10:00 AM to 9:00 PM)
   const availableSlotTimes = useMemo(() => {
@@ -170,6 +202,23 @@ const AdminDashboardInner: React.FC = () => {
       .filter((o) => o?.status === 'confirmed' && o?.date && o.date >= customRangeStart && o.date <= customRangeEnd)
       .reduce((sum, o) => sum + (o?.totalAmount || 0), 0);
   }, [orders, customRangeStart, customRangeEnd]);
+
+  // Daily Revenue Breakdown
+  const dailyRevenueBreakdown = useMemo(() => {
+    const map = new Map<string, { date: string; total: number; count: number }>();
+    (orders || []).forEach((o) => {
+      if (o?.status === 'confirmed' && o?.date) {
+        const existing = map.get(o.date);
+        if (existing) {
+          existing.total += o.totalAmount || 0;
+          existing.count += 1;
+        } else {
+          map.set(o.date, { date: o.date, total: o.totalAmount || 0, count: 1 });
+        }
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
+  }, [orders]);
 
   // Approve action — requires confirmation modal first
   const handleApproveClick = (order: BookingOrder) => {
@@ -255,6 +304,45 @@ const AdminDashboardInner: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedCode(text);
     setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  // ─── PRICING SUBMIT ───
+  const handlePricingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPricingSaving(true);
+    setPricingSuccessMsg('');
+    const res = await updatePricing({ normalDayRate: pricingNormalRate, saturdayRate: pricingSatRate });
+    setPricingSaving(false);
+    if (res.success) setPricingSuccessMsg('Pricing updated successfully!');
+  };
+
+  // ─── CLOSURE SUBMIT ───
+  const handleClosureSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!closureReason.trim()) return;
+    setClosureSaving(true);
+    setClosureSuccessMsg('');
+    const res = await addClosure({
+      date: closureDate,
+      startTime: closureStartTime,
+      endTime: closureEndTime,
+      reason: closureReason.trim(),
+    });
+    setClosureSaving(false);
+    if (res.success) {
+      setClosureSuccessMsg('Court closure added!');
+      setClosureReason('');
+    }
+  };
+
+  // ─── ANNOUNCEMENT SUBMIT ───
+  const handleAnnouncementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAnnSaving(true);
+    setAnnSuccessMsg('');
+    const res = await updateAnnouncement({ title: annTitle, message: annMessage, active: annActive });
+    setAnnSaving(false);
+    if (res.success) setAnnSuccessMsg('Announcement saved!');
   };
 
   // ─── LOGIN SCREEN FOR NON-ADMIN ───
@@ -382,81 +470,35 @@ const AdminDashboardInner: React.FC = () => {
 
         {/* Scrollable View Tabs on Mobile */}
         <div className="flex items-center gap-1 px-2.5 py-1.5 overflow-x-auto no-scrollbar">
-          <button
-            onClick={() => setActiveView('overview')}
-            className={cn(
-              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
-              activeView === 'overview' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
-            )}
-          >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>Overview</span>
-          </button>
-          <button
-            onClick={() => setActiveView('approvals')}
-            className={cn(
-              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
-              activeView === 'approvals' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
-            )}
-          >
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
-            <span>Queue</span>
-            {pendingOrders.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-amber-950">
-                {pendingOrders.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveView('courts')}
-            className={cn(
-              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
-              activeView === 'courts' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
-            )}
-          >
-            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Courts</span>
-          </button>
-          <button
-            onClick={() => setActiveView('manual')}
-            className={cn(
-              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
-              activeView === 'manual' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
-            )}
-          >
-            <PlusCircle className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Walk-in</span>
-          </button>
-          <button
-            onClick={() => setActiveView('orders')}
-            className={cn(
-              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
-              activeView === 'orders' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
-            )}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Ledger</span>
-          </button>
-          <button
-            onClick={() => setActiveView('revenue')}
-            className={cn(
-              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
-              activeView === 'revenue' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
-            )}
-          >
-            <Banknote className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Revenue</span>
-          </button>
-          <button
-            onClick={() => setActiveView('customers')}
-            className={cn(
-              'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
-              activeView === 'customers' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
-            )}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Players</span>
-          </button>
+          {([
+            { key: 'overview' as const, icon: <LayoutDashboard className="w-3.5 h-3.5" />, label: 'Overview', badge: 0 },
+            { key: 'approvals' as const, icon: <Clock className="w-3.5 h-3.5 text-amber-400" />, label: 'Queue', badge: pendingOrders.length },
+            { key: 'courts' as const, icon: <Calendar className="w-3.5 h-3.5 text-emerald-400" />, label: 'Courts', badge: 0 },
+            { key: 'manual' as const, icon: <PlusCircle className="w-3.5 h-3.5 text-cyan-400" />, label: 'Walk-in', badge: 0 },
+            { key: 'orders' as const, icon: <FileText className="w-3.5 h-3.5" />, label: 'Ledger', badge: 0 },
+            { key: 'revenue' as const, icon: <Banknote className="w-3.5 h-3.5 text-emerald-400" />, label: 'Revenue', badge: 0 },
+            { key: 'customers' as const, icon: <Users className="w-3.5 h-3.5" />, label: 'Players', badge: 0 },
+            { key: 'pricing' as const, icon: <Coins className="w-3.5 h-3.5 text-yellow-400" />, label: 'Rates', badge: 0 },
+            { key: 'closures' as const, icon: <Ban className="w-3.5 h-3.5 text-red-400" />, label: 'Holidays', badge: 0 },
+            { key: 'announcements' as const, icon: <Megaphone className="w-3.5 h-3.5 text-blue-400" />, label: 'Notice', badge: 0 },
+          ]).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveView(tab.key)}
+              className={cn(
+                'px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1',
+                activeView === tab.key ? 'bg-emerald-700 text-white shadow-sm' : 'bg-surface-800 text-surface-400'
+              )}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+              {tab.badge > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-amber-950">
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -483,121 +525,66 @@ const AdminDashboardInner: React.FC = () => {
 
           {/* Core Navigation Items */}
           <nav className="p-3 space-y-1">
-            <button
-              onClick={() => setActiveView('overview')}
-              className={cn(
-                'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all',
-                activeView === 'overview'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-surface-400 hover:text-white hover:bg-surface-800/60'
-              )}
-            >
-              <span className="flex items-center gap-2.5">
-                <LayoutDashboard className="w-4 h-4" />
-                <span>Dashboard Overview</span>
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveView('approvals')}
-              className={cn(
-                'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all',
-                activeView === 'approvals'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-surface-400 hover:text-white hover:bg-surface-800/60'
-              )}
-            >
-              <span className="flex items-center gap-2.5">
-                <Clock className="w-4 h-4 text-amber-400" />
-                <span>Pending Queue</span>
-              </span>
-              {pendingOrders.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-amber-950 animate-pulse">
-                  {pendingOrders.length}
+            {([
+              { key: 'overview' as const, icon: <LayoutDashboard className="w-4 h-4" />, label: 'Dashboard Overview', badge: 0, count: -1 },
+              { key: 'approvals' as const, icon: <Clock className="w-4 h-4 text-amber-400" />, label: 'Pending Queue', badge: pendingOrders.length, count: -1 },
+              { key: 'courts' as const, icon: <Calendar className="w-4 h-4 text-emerald-400" />, label: 'Court Schedule Master', badge: 0, count: -1 },
+              { key: 'manual' as const, icon: <PlusCircle className="w-4 h-4 text-cyan-400" />, label: 'Walk-in / Offline Desk', badge: 0, count: -1 },
+              { key: 'orders' as const, icon: <FileText className="w-4 h-4" />, label: 'All Bookings Ledger', badge: 0, count: orders.length },
+              { key: 'revenue' as const, icon: <Banknote className="w-4 h-4 text-emerald-400" />, label: 'Revenue & Finance', badge: 0, count: -1 },
+              { key: 'customers' as const, icon: <Users className="w-4 h-4" />, label: 'Players Directory', badge: 0, count: customerDirectory.length },
+            ]).map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setActiveView(item.key)}
+                className={cn(
+                  'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all',
+                  activeView === item.key
+                    ? 'bg-emerald-700 text-white shadow-sm'
+                    : 'text-surface-400 hover:text-white hover:bg-surface-800/60'
+                )}
+              >
+                <span className="flex items-center gap-2.5">
+                  {item.icon}
+                  <span>{item.label}</span>
                 </span>
-              )}
-            </button>
+                {item.badge > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-amber-950 animate-pulse">
+                    {item.badge}
+                  </span>
+                )}
+                {item.count >= 0 && item.badge === 0 && (
+                  <span className="text-[11px] font-mono opacity-60">{item.count}</span>
+                )}
+              </button>
+            ))}
 
-            <button
-              onClick={() => setActiveView('courts')}
-              className={cn(
-                'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all',
-                activeView === 'courts'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-surface-400 hover:text-white hover:bg-surface-800/60'
-              )}
-            >
-              <span className="flex items-center gap-2.5">
-                <Calendar className="w-4 h-4 text-emerald-400" />
-                <span>Court Schedule Master</span>
-              </span>
-            </button>
+            {/* Separator */}
+            <div className="pt-3 pb-1">
+              <span className="text-[10px] font-black uppercase tracking-widest text-surface-600 px-3.5">Settings</span>
+            </div>
 
-            <button
-              onClick={() => setActiveView('manual')}
-              className={cn(
-                'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all',
-                activeView === 'manual'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-surface-400 hover:text-white hover:bg-surface-800/60'
-              )}
-            >
-              <span className="flex items-center gap-2.5">
-                <PlusCircle className="w-4 h-4 text-cyan-400" />
-                <span>Walk-in / Offline Desk</span>
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveView('orders')}
-              className={cn(
-                'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all',
-                activeView === 'orders'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-surface-400 hover:text-white hover:bg-surface-800/60'
-              )}
-            >
-              <span className="flex items-center gap-2.5">
-                <FileText className="w-4 h-4" />
-                <span>All Bookings Ledger</span>
-              </span>
-              <span className="text-[11px] font-mono opacity-60">
-                {orders.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveView('revenue')}
-              className={cn(
-                'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all',
-                activeView === 'revenue'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-surface-400 hover:text-white hover:bg-surface-800/60'
-              )}
-            >
-              <span className="flex items-center gap-2.5">
-                <Banknote className="w-4 h-4 text-emerald-400" />
-                <span>Revenue &amp; Finance</span>
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveView('customers')}
-              className={cn(
-                'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all',
-                activeView === 'customers'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-surface-400 hover:text-white hover:bg-surface-800/60'
-              )}
-            >
-              <span className="flex items-center gap-2.5">
-                <Users className="w-4 h-4" />
-                <span>Players Directory</span>
-              </span>
-              <span className="text-[11px] font-mono opacity-60">
-                {customerDirectory.length}
-              </span>
-            </button>
+            {([
+              { key: 'pricing' as const, icon: <Coins className="w-4 h-4 text-yellow-400" />, label: 'Pricing & Rates Manager' },
+              { key: 'closures' as const, icon: <Ban className="w-4 h-4 text-red-400" />, label: 'Holiday & Court Locks' },
+              { key: 'announcements' as const, icon: <Megaphone className="w-4 h-4 text-blue-400" />, label: 'Public Announcement' },
+            ]).map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setActiveView(item.key)}
+                className={cn(
+                  'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all',
+                  activeView === item.key
+                    ? 'bg-emerald-700 text-white shadow-sm'
+                    : 'text-surface-400 hover:text-white hover:bg-surface-800/60'
+                )}
+              >
+                <span className="flex items-center gap-2.5">
+                  {item.icon}
+                  <span>{item.label}</span>
+                </span>
+              </button>
+            ))}
           </nav>
         </div>
 
@@ -855,7 +842,8 @@ const AdminDashboardInner: React.FC = () => {
                         leftIcon={<Check className="w-4 h-4" />}
                       >
                         Approve &amp; Lock Slot
-                      </Button>                    </div>
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -893,6 +881,7 @@ const AdminDashboardInner: React.FC = () => {
                 const isConfirmed = slot.status === 'confirmed';
                 const isPending = slot.status === 'pending';
                 const isAvailable = slot.status === 'available';
+                const isClosed = slot.status === 'disabled';
 
                 return (
                   <div
@@ -901,7 +890,8 @@ const AdminDashboardInner: React.FC = () => {
                       'p-4 rounded-2xl border-2 flex flex-col justify-between min-h-[110px] transition-all',
                       isConfirmed && 'bg-emerald-50 border-emerald-500 text-emerald-950',
                       isPending && 'bg-amber-50 border-amber-400 text-amber-950',
-                      isAvailable && 'bg-white border-surface-200 text-surface-900'
+                      isAvailable && 'bg-white border-surface-200 text-surface-900',
+                      isClosed && 'bg-purple-50 border-purple-400 text-purple-950 opacity-75'
                     )}
                   >
                     <div className="flex items-center justify-between">
@@ -923,10 +913,17 @@ const AdminDashboardInner: React.FC = () => {
                           Open
                         </span>
                       )}
+                      {isClosed && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-purple-500 text-white flex items-center gap-1">
+                          <Lock className="w-3 h-3" /> Closed
+                        </span>
+                      )}
                     </div>
 
                     <div className="mt-3 pt-2 border-t border-current/15 text-xs">
-                      {slot.customerName ? (
+                      {isClosed ? (
+                        <span className="text-purple-700 font-bold">{slot.closureReason || 'Holiday / Maintenance'}</span>
+                      ) : slot.customerName ? (
                         <div className="flex items-center justify-between gap-2">
                           <div className="overflow-hidden">
                             <span className="font-bold block truncate">{slot.customerName}</span>
@@ -1271,6 +1268,43 @@ const AdminDashboardInner: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Daily Revenue Breakdown Table */}
+            <div className="bg-white rounded-3xl border border-surface-200 overflow-hidden shadow-card">
+              <div className="p-5 border-b border-surface-200">
+                <h3 className="text-xs font-black uppercase tracking-wider text-surface-700">
+                  Daily Revenue Breakdown (Last 30 days)
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-surface-50 border-b border-surface-200 font-bold text-surface-500 uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="py-3 px-4">Date</th>
+                      <th className="py-3 px-4">Confirmed Bookings</th>
+                      <th className="py-3 px-4 text-right">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-surface-100 font-medium">
+                    {dailyRevenueBreakdown.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="py-8 text-center text-surface-400">No revenue data yet.</td>
+                      </tr>
+                    ) : (
+                      dailyRevenueBreakdown.map((row) => (
+                        <tr key={row.date} className="hover:bg-surface-50/60 transition-colors">
+                          <td className="py-3 px-4 font-bold text-surface-900">{row.date}</td>
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 rounded bg-surface-100 font-bold">{row.count} slots</span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-black text-emerald-800">{formatNPR(row.total)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1326,6 +1360,274 @@ const AdminDashboardInner: React.FC = () => {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 8. PRICING & RATES MANAGER */}
+        {activeView === 'pricing' && (
+          <div className="max-w-2xl space-y-6">
+            <div>
+              <h2 className="text-2xl font-black text-surface-900 tracking-tight flex items-center gap-2">
+                <Coins className="w-6 h-6 text-yellow-500" />
+                <span>Pricing &amp; Rates Manager</span>
+              </h2>
+              <p className="text-xs text-surface-500 mt-1">
+                Set per-hour court rates. Changes apply to all future bookings instantly.
+              </p>
+            </div>
+
+            <form onSubmit={handlePricingSubmit} className="bg-white rounded-3xl border border-surface-200 p-6 sm:p-8 shadow-card space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-surface-700 uppercase mb-1">
+                    Normal Day Rate (NPR / hr)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={pricingNormalRate}
+                    onChange={(e) => setPricingNormalRate(Number(e.target.value))}
+                    className="w-full px-3 py-2.5 rounded-xl border border-surface-200 text-sm font-bold bg-surface-50"
+                  />
+                  <span className="text-[11px] text-surface-400 mt-1 block">Sun – Fri rate per hour</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-surface-700 uppercase mb-1">
+                    Saturday Rate (NPR / hr)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={pricingSatRate}
+                    onChange={(e) => setPricingSatRate(Number(e.target.value))}
+                    className="w-full px-3 py-2.5 rounded-xl border border-surface-200 text-sm font-bold bg-surface-50"
+                  />
+                  <span className="text-[11px] text-surface-400 mt-1 block">Saturday premium rate per hour</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-surface-50 rounded-xl text-xs text-surface-600">
+                <strong>Current Live Rates:</strong> Normal = {formatNPR(pricing.normalDayRate)} / hr, Saturday = {formatNPR(pricing.saturdayRate)} / hr
+              </div>
+
+              {pricingSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  {pricingSuccessMsg}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                className="w-full bg-emerald-700 hover:bg-emerald-800 font-black"
+                isLoading={pricingSaving}
+              >
+                Save Pricing Changes
+              </Button>
+            </form>
+          </div>
+        )}
+
+        {/* 9. HOLIDAY & COURT LOCKS */}
+        {activeView === 'closures' && (
+          <div className="max-w-3xl space-y-6">
+            <div>
+              <h2 className="text-2xl font-black text-surface-900 tracking-tight flex items-center gap-2">
+                <Ban className="w-6 h-6 text-red-500" />
+                <span>Holiday &amp; Court Locks</span>
+              </h2>
+              <p className="text-xs text-surface-500 mt-1">
+                Block specific dates/hours for holidays, maintenance, or private events. Locked slots cannot be booked.
+              </p>
+            </div>
+
+            <form onSubmit={handleClosureSubmit} className="bg-white rounded-3xl border border-surface-200 p-6 sm:p-8 shadow-card space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-surface-700 uppercase mb-1">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={closureDate}
+                    onChange={(e) => setClosureDate(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-surface-200 text-xs font-bold bg-surface-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-surface-700 uppercase mb-1">Start Time</label>
+                  <select
+                    value={closureStartTime}
+                    onChange={(e) => setClosureStartTime(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-surface-200 text-xs font-bold bg-surface-50"
+                  >
+                    {availableSlotTimes.map((t) => (
+                      <option key={t.startTime} value={t.startTime}>{t.startTime}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-surface-700 uppercase mb-1">End Time</label>
+                  <select
+                    value={closureEndTime}
+                    onChange={(e) => setClosureEndTime(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-surface-200 text-xs font-bold bg-surface-50"
+                  >
+                    {availableSlotTimes.map((t) => (
+                      <option key={t.endTime} value={t.endTime}>{t.endTime}</option>
+                    ))}
+                    <option value="21:00">21:00</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-surface-700 uppercase mb-1">Reason / Note</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Dashain Holiday, Turf Maintenance, Private Tournament"
+                  value={closureReason}
+                  onChange={(e) => setClosureReason(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-surface-200 text-xs font-medium"
+                />
+              </div>
+
+              {closureSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  {closureSuccessMsg}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                className="w-full bg-red-600 hover:bg-red-700 font-black"
+                isLoading={closureSaving}
+              >
+                Lock Court Hours
+              </Button>
+            </form>
+
+            {/* Active Closures List */}
+            {closures.length > 0 && (
+              <div className="bg-white rounded-3xl border border-surface-200 overflow-hidden shadow-card">
+                <div className="p-5 border-b border-surface-200">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-surface-700">
+                    Active Court Locks ({closures.length})
+                  </h3>
+                </div>
+                <div className="divide-y divide-surface-100">
+                  {closures.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between px-5 py-3 hover:bg-surface-50 transition-colors">
+                      <div className="text-xs">
+                        <span className="font-bold text-surface-900 block">{c.date} — {c.startTime} to {c.endTime}</span>
+                        <span className="text-surface-500">{c.reason}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => { await removeClosure(c.id); }}
+                        className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition-colors"
+                        title="Remove closure"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 10. PUBLIC ANNOUNCEMENT */}
+        {activeView === 'announcements' && (
+          <div className="max-w-2xl space-y-6">
+            <div>
+              <h2 className="text-2xl font-black text-surface-900 tracking-tight flex items-center gap-2">
+                <Megaphone className="w-6 h-6 text-blue-500" />
+                <span>Public Announcement</span>
+              </h2>
+              <p className="text-xs text-surface-500 mt-1">
+                Post a notice visible to all users when they open the website. Users can dismiss it until you publish a new one.
+              </p>
+            </div>
+
+            <form onSubmit={handleAnnouncementSubmit} className="bg-white rounded-3xl border border-surface-200 p-6 sm:p-8 shadow-card space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-surface-700 uppercase mb-1">Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dashain Schedule Update"
+                  value={annTitle}
+                  onChange={(e) => setAnnTitle(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-surface-200 text-xs font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-surface-700 uppercase mb-1">Message</label>
+                <textarea
+                  rows={4}
+                  placeholder="Write your announcement message here..."
+                  value={annMessage}
+                  onChange={(e) => setAnnMessage(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-surface-200 text-xs font-medium resize-none"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAnnActive(!annActive)}
+                  className={cn(
+                    'w-12 h-6 rounded-full transition-colors relative',
+                    annActive ? 'bg-emerald-600' : 'bg-surface-300'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                      annActive ? 'translate-x-6' : 'translate-x-0.5'
+                    )}
+                  />
+                </button>
+                <span className="text-xs font-bold text-surface-700">
+                  {annActive ? 'Active — Visible to all users' : 'Inactive — Hidden from users'}
+                </span>
+              </div>
+
+              {annSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  {annSuccessMsg}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                className="w-full bg-blue-600 hover:bg-blue-700 font-black"
+                isLoading={annSaving}
+              >
+                {annActive ? 'Publish Announcement' : 'Save Draft'}
+              </Button>
+            </form>
+
+            {announcement && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl text-xs space-y-1">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-blue-600" />
+                  <span className="font-black text-blue-900">Current Live Announcement</span>
+                  <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-black', announcement.active ? 'bg-emerald-100 text-emerald-900' : 'bg-surface-200 text-surface-600')}>
+                    {announcement.active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                <p className="font-bold text-blue-900">{announcement.title || '(No title)'}</p>
+                <p className="text-blue-800">{announcement.message || '(No message)'}</p>
+              </div>
+            )}
           </div>
         )}
 
