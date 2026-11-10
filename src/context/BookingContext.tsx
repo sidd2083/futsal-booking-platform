@@ -65,6 +65,7 @@ interface BookingContextType {
     customerPhone: string;
     notes?: string;
   }) => Promise<{ success: boolean; error?: string; order?: BookingOrder }>;
+  deleteOrderFromHistory: (orderId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
@@ -912,12 +913,84 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [orders]
   );
 
-  // Auto-prune order history: customer sees ONLY their own actual bookings; manual counter bookings are excluded!
+  // Customer deletes an order from their personal history (not active confirmed future bookings)
+  const deleteOrderFromHistory = useCallback(
+    async (orderId: string): Promise<{ success: boolean; error?: string }> => {
+      if (!user) return { success: false, error: 'Not authenticated.' };
+
+      const target = orders.find((o) => o.id === orderId);
+      if (!target) return { success: false, error: 'Order not found in history.' };
+
+      // Security check: Customer can only delete their own order
+      if (target.userId !== user.uid) {
+        return { success: false, error: 'You can only delete your own orders.' };
+      }
+
+      // Check: "not the booked once" (active confirmed match on court cannot be deleted)
+      const today = getNepalTodayFormatted();
+      if (target.status === 'confirmed' && (!target.date || target.date >= today)) {
+        return {
+          success: false,
+          error: 'Active confirmed match slots cannot be deleted while reserved on court.',
+        };
+      }
+
+      const firestore = db;
+      if (isFirebaseConfigured && firestore) {
+        try {
+          await deleteDoc(doc(firestore, 'bookings', orderId));
+
+          // If was pending, release court slot lock
+          if (target.status === 'pending' && target.slotId) {
+            await deleteDoc(doc(firestore, 'slots', target.slotId)).catch(() => {});
+          }
+        } catch (err: any) {
+          console.warn('Firestore delete order notice:', err);
+        }
+      }
+
+      // Remove immediately from local state & cache
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      return { success: true };
+    },
+    [user, orders]
+  );
+
+  // Auto-prune order history with smart priority sorting:
+  // Active/Booked orders come on TOP, rejected orders sink DOWN to the bottom!
   const userOrders = useMemo(() => {
     if (!user) return [];
+    const today = getNepalTodayFormatted();
+
+    const getOrderPriority = (o: BookingOrder): number => {
+      // 1. Confirmed upcoming/today: top priority
+      if (o.status === 'confirmed' && (!o.date || o.date >= today)) return 1;
+      // 2. Pending awaiting review: second priority (new booking requests)
+      if (o.status === 'pending') return 2;
+      // 3. Past played matches (confirmed but date passed)
+      if (o.status === 'confirmed') return 3;
+      // 4. Cancelled or expired
+      if (o.status === 'cancelled' || o.status === 'expired') return 4;
+      // 5. Rejected orders: always sink to the bottom below active orders
+      if (o.status === 'rejected') return 5;
+      return 6;
+    };
+
     return orders
-      .filter((o) => o.userId === user.uid && !o.isManualBooking && o.userId !== 'admin_counter' && o.userId !== 'admin_counter_desk')
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .filter(
+        (o) =>
+          o.userId === user.uid &&
+          !o.isManualBooking &&
+          o.userId !== 'admin_counter' &&
+          o.userId !== 'admin_counter_desk'
+      )
+      .sort((a, b) => {
+        const pA = getOrderPriority(a);
+        const pB = getOrderPriority(b);
+        if (pA !== pB) return pA - pB;
+        // Within same priority, newest creation comes first
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      })
       .slice(0, 7);
   }, [orders, user]);
 
@@ -925,11 +998,27 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     if (!user) return;
     const userAll = orders
-      .filter((o) => o.userId === user.uid && !o.isManualBooking && o.userId !== 'admin_counter' && o.userId !== 'admin_counter_desk')
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      .filter((o) => o.userId === user.uid && !o.isManualBooking && o.userId !== 'admin_counter' && o.userId !== 'admin_counter_desk');
 
     if (userAll.length > 7) {
-      const keepIds = new Set(userAll.slice(0, 7).map((o) => o.id));
+      const today = getNepalTodayFormatted();
+      const getOrderPriority = (o: BookingOrder): number => {
+        if (o.status === 'confirmed' && (!o.date || o.date >= today)) return 1;
+        if (o.status === 'pending') return 2;
+        if (o.status === 'confirmed') return 3;
+        if (o.status === 'cancelled' || o.status === 'expired') return 4;
+        if (o.status === 'rejected') return 5;
+        return 6;
+      };
+
+      const sorted = [...userAll].sort((a, b) => {
+        const pA = getOrderPriority(a);
+        const pB = getOrderPriority(b);
+        if (pA !== pB) return pA - pB;
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+
+      const keepIds = new Set(sorted.slice(0, 7).map((o) => o.id));
       setOrders((prev) =>
         prev.filter((o) => (o.userId !== user.uid || o.isManualBooking) || keepIds.has(o.id))
       );
@@ -961,6 +1050,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         adminRejectBooking,
         adminCancelBooking,
         adminCreateManualBooking,
+        deleteOrderFromHistory,
       }}
     >
       {children}

@@ -6,6 +6,7 @@ import { formatNPR, formatSlotTime, getNepalTodayFormatted, cn } from '@/lib/uti
 import { BookingOrder } from '@/types';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { Modal } from '@/components/common/Modal';
 import { AuthModal } from '@/components/common/AuthModal';
 import { AnnouncementModal } from '@/components/common/AnnouncementModal';
 import {
@@ -18,15 +19,22 @@ import {
   ArrowRight,
   Phone,
   Bell,
+  Trash2,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const CustomerBookingsPage: React.FC = () => {
   const { user } = useAuth();
-  const { userOrders } = useBooking();
+  const { userOrders, deleteOrderFromHistory } = useBooking();
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [noticeModalOpen, setNoticeModalOpen] = useState(false);
   const [filterTab, setFilterTab] = useState<'all' | 'waiting' | 'approved' | 'played'>('all');
+
+  // Delete confirmation modal state
+  const [deletingOrder, setDeletingOrder] = useState<BookingOrder | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const nepalToday = useMemo(() => getNepalTodayFormatted(), []);
 
@@ -213,6 +221,8 @@ export const CustomerBookingsPage: React.FC = () => {
               const isConfirmed = order.status === 'confirmed';
               const isPending = order.status === 'pending';
               const isRejected = order.status === 'rejected';
+              const isConfirmedFuture = isConfirmed && (!order.date || order.date >= nepalToday);
+              const canDelete = !isConfirmedFuture;
 
               return (
                 <div
@@ -234,7 +244,7 @@ export const CustomerBookingsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div>
+                    <div className="flex items-center gap-2">
                       {isConfirmed && (
                         <Badge variant="success" size="md" dot>
                           Confirmed by Staff
@@ -249,6 +259,36 @@ export const CustomerBookingsPage: React.FC = () => {
                         <Badge variant="danger" size="md" dot>
                           Request Declined
                         </Badge>
+                      )}
+                      {order.status === 'cancelled' && (
+                        <Badge variant="neutral" size="md">
+                          Cancelled
+                        </Badge>
+                      )}
+                      {order.status === 'expired' && (
+                        <Badge variant="neutral" size="md">
+                          Expired
+                        </Badge>
+                      )}
+
+                      {/* Can delete rejected, expired, cancelled, played earlier or pending, but NOT active confirmed booked slots */}
+                      {canDelete ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeletingOrder(order);
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-[11px] font-bold transition-colors ml-1"
+                          title="Delete from history"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      ) : (
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1 ml-1">
+                          <ShieldCheck className="w-3 h-3 text-emerald-600" /> Booked Match
+                        </span>
                       )}
                     </div>
                   </div>
@@ -355,6 +395,79 @@ export const CustomerBookingsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal with Safe Popup */}
+      {deletingOrder && (
+        <Modal
+          isOpen={true}
+          onClose={() => setDeletingOrder(null)}
+          title="Delete Order from History"
+          description="Are you sure you want to remove this record from your match history? This action cannot be undone."
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 bg-surface-50 border border-surface-200 rounded-2xl text-xs space-y-2">
+              <div className="flex justify-between items-center pb-1.5 border-b border-surface-200">
+                <span className="text-surface-500">Order ID:</span>
+                <span className="font-mono font-bold text-surface-900">{deletingOrder.id}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-surface-500">Match Date:</span>
+                <span className="font-bold text-surface-900">{deletingOrder.date}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-surface-500">Time Window:</span>
+                <span className="font-bold text-surface-900">{formatSlotTime(deletingOrder.startTime, deletingOrder.endTime)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-surface-500">Status:</span>
+                <span className="font-bold uppercase text-[11px] text-surface-900">{deletingOrder.status}</span>
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-surface-200">
+                <span className="text-surface-500">Total Fee:</span>
+                <span className="font-extrabold text-emerald-800">{formatNPR(deletingOrder.totalAmount)}</span>
+              </div>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => setDeletingOrder(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                className="bg-red-600 hover:bg-red-700 font-black text-white"
+                onClick={async () => {
+                  setIsDeleting(true);
+                  setDeleteError(null);
+                  const res = await deleteOrderFromHistory(deletingOrder.id);
+                  setIsDeleting(false);
+                  if (res.success) {
+                    setDeletingOrder(null);
+                  } else {
+                    setDeleteError(res.error || 'Failed to remove order from history.');
+                  }
+                }}
+                isLoading={isDeleting}
+                leftIcon={<Trash2 className="w-4 h-4" />}
+              >
+                Yes, Delete Record
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
     </div>
   );
