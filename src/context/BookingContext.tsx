@@ -616,17 +616,18 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       // Strict revenue rule: ONLY CONFIRMED
       if (o.status === 'confirmed') {
+        const amt = typeof o.totalAmount === 'number' && !isNaN(o.totalAmount) ? o.totalAmount : 0;
         confirmedCount++;
-        allTimeRev += o.totalAmount;
+        allTimeRev += amt;
 
         if (o.date === todayStr) {
-          todayRev += o.totalAmount;
+          todayRev += amt;
         }
         if (o.date >= weekStartStr && o.date <= todayStr) {
-          weekRev += o.totalAmount;
+          weekRev += amt;
         }
-        if (o.date.startsWith(currentMonthPrefix)) {
-          monthRev += o.totalAmount;
+        if (o.date && o.date.startsWith(currentMonthPrefix)) {
+          monthRev += amt;
         }
       }
     });
@@ -649,10 +650,29 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [orders]
   );
 
-  const userOrders = useMemo(
-    () => (user ? orders.filter((o) => o.userId === user.uid) : []),
-    [orders, user]
-  );
+  // Auto-prune order history: customer sees ONLY latest 7 orders; older orders are pruned
+  const userOrders = useMemo(() => {
+    if (!user) return [];
+    return orders
+      .filter((o) => o.userId === user.uid)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, 7);
+  }, [orders, user]);
+
+  // Persistent auto-cleanup: delete user orders older than the latest 7 from storage and state
+  useEffect(() => {
+    if (!user) return;
+    const userAll = orders
+      .filter((o) => o.userId === user.uid)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+    if (userAll.length > 7) {
+      const keepIds = new Set(userAll.slice(0, 7).map((o) => o.id));
+      setOrders((prev) =>
+        prev.filter((o) => o.userId !== user.uid || keepIds.has(o.id))
+      );
+    }
+  }, [user, orders]);
 
   return (
     <BookingContext.Provider

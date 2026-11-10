@@ -6,6 +6,7 @@ import { PWAProvider } from '@/context/PWAContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 // Pages
 import { HomePage } from '@/pages/public/HomePage';
@@ -24,16 +25,18 @@ export const App: React.FC = () => {
             <div className="flex flex-col min-h-screen bg-white">
               <Navbar />
               <main className="flex-1 w-full min-w-0 pb-16 md:pb-0">
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/book" element={<SportSelectPage />} />
-                  <Route path="/book/futsal" element={<FutsalBookingPage />} />
-                  <Route path="/order/:orderId" element={<OrderDetailsPage />} />
-                  <Route path="/booking/order/:orderId" element={<OrderDetailsPage />} />
-                  <Route path="/customer/bookings" element={<CustomerBookingsPage />} />
-                  <Route path="/admin" element={<AdminDashboardPage />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                <ErrorBoundary>
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/book" element={<SportSelectPage />} />
+                    <Route path="/book/futsal" element={<FutsalBookingPage />} />
+                    <Route path="/order/:orderId" element={<OrderDetailsPage />} />
+                    <Route path="/booking/order/:orderId" element={<OrderDetailsPage />} />
+                    <Route path="/customer/bookings" element={<CustomerBookingsPage />} />
+                    <Route path="/admin" element={<AdminDashboardPage />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </ErrorBoundary>
               </main>
               <Footer />
               <MobileBottomNav />

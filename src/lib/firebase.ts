@@ -2,14 +2,16 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 
+// Production Firebase project configuration (futsal-2f004)
+// Fallbacks ensure Vercel deployments run seamlessly even before manual env vars are configured.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBB4aRkDuDwoLHbsnfMLXbrQuuwNYUFzpc',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'futsal-2f004.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'futsal-2f004',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'futsal-2f004.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '633222992990',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:633222992990:web:a7343f2e96ae3d068ed0cf',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-H653SYZ4XJ',
 };
 
 export const isFirebaseConfigured = Boolean(

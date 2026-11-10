@@ -114,11 +114,16 @@ export const CustomerBookingsPage: React.FC = () => {
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-base sm:text-lg font-black text-surface-900 tracking-tight">
-              My Orders &amp; Booking History ({userOrders.length})
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-black text-surface-900 tracking-tight">
+                My Orders &amp; Booking History
+              </h2>
+              <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                Latest 7 Active
+              </span>
+            </div>
             <span className="text-xs text-surface-500">
-              Live slips, staff verification status, and confirmed match codes
+              Showing your latest 7 reservations. Older past match records are automatically cleared to keep your slips clean.
             </span>
           </div>
 

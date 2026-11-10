@@ -33,8 +33,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
-export const AdminDashboardPage: React.FC = () => {
+const AdminDashboardInner: React.FC = () => {
   const { user, isAdmin, loginWithEmailPassword, logout } = useAuth();
   const {
     orders,
@@ -118,12 +119,20 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Filtered orders for the ledger
   const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
+    const q = (searchTerm || '').trim().toLowerCase();
+    return (orders || []).filter((o) => {
+      if (!o) return false;
+      const cName = (o.customerName || '').toLowerCase();
+      const cPhone = o.customerPhone || '';
+      const bCode = (o.bookingCode || '').toLowerCase();
+      const bId = (o.id || '').toLowerCase();
+
       const matchSearch =
-        o.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        o.customerPhone.includes(searchTerm) ||
-        (o.bookingCode && o.bookingCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        o.id.toLowerCase().includes(searchTerm.toLowerCase());
+        !q ||
+        cName.includes(q) ||
+        cPhone.includes(searchTerm) ||
+        bCode.includes(q) ||
+        bId.includes(q);
 
       const matchStatus = statusFilter === 'all' ? true : o.status === statusFilter;
       return matchSearch && matchStatus;
@@ -133,21 +142,22 @@ export const AdminDashboardPage: React.FC = () => {
   // Unique customer directory from bookings
   const customerDirectory = useMemo(() => {
     const map = new Map<string, { name: string; phone: string; count: number; spent: number; lastDate: string }>();
-    orders.forEach((o) => {
-      const phone = o.customerPhone.trim();
+    (orders || []).forEach((o) => {
+      if (!o) return;
+      const phone = (o.customerPhone || '').trim();
       if (!phone) return;
       const existing = map.get(phone);
       if (existing) {
         existing.count += 1;
-        if (o.status === 'confirmed') existing.spent += o.totalAmount;
-        if (o.date > existing.lastDate) existing.lastDate = o.date;
+        if (o.status === 'confirmed') existing.spent += (o.totalAmount || 0);
+        if (o.date && (!existing.lastDate || o.date > existing.lastDate)) existing.lastDate = o.date;
       } else {
         map.set(phone, {
-          name: o.customerName,
+          name: o.customerName || 'Customer',
           phone,
           count: 1,
-          spent: o.status === 'confirmed' ? o.totalAmount : 0,
-          lastDate: o.date,
+          spent: o.status === 'confirmed' ? (o.totalAmount || 0) : 0,
+          lastDate: o.date || '',
         });
       }
     });
@@ -156,9 +166,9 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Custom Date Range Revenue
   const customRangeRevenue = useMemo(() => {
-    return orders
-      .filter((o) => o.status === 'confirmed' && o.date >= customRangeStart && o.date <= customRangeEnd)
-      .reduce((sum, o) => sum + o.totalAmount, 0);
+    return (orders || [])
+      .filter((o) => o?.status === 'confirmed' && o?.date && o.date >= customRangeStart && o.date <= customRangeEnd)
+      .reduce((sum, o) => sum + (o?.totalAmount || 0), 0);
   }, [orders, customRangeStart, customRangeEnd]);
 
   // Approve action — requires confirmation modal first
@@ -1451,5 +1461,13 @@ export const AdminDashboardPage: React.FC = () => {
       )}
 
     </div>
+  );
+};
+
+export const AdminDashboardPage: React.FC = () => {
+  return (
+    <ErrorBoundary fallbackTitle="Admin Workspace Recovery Mode">
+      <AdminDashboardInner />
+    </ErrorBoundary>
   );
 };

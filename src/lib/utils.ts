@@ -9,8 +9,9 @@ export function cn(...inputs: ClassValue[]) {
  * Format currency amount into Nepalese Rupees (NPR).
  * Example: formatNPR(1300) => "NPR 1,300"
  */
-export function formatNPR(amount: number): string {
-  return `NPR ${amount.toLocaleString('en-IN')}`;
+export function formatNPR(amount?: number | null): string {
+  const safe = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
+  return `NPR ${safe.toLocaleString('en-IN')}`;
 }
 
 /**
@@ -47,14 +48,21 @@ export function isSaturdayDate(dateString: string): boolean {
  * Get display time range for a slot.
  * Example: formatSlotTime("10:00", "11:00") => "10:00 AM – 11:00 AM"
  */
-export function formatSlotTime(startTime: string, endTime: string): string {
-  const formatTime = (timeStr: string) => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
+export function formatSlotTime(startTime?: string | null, endTime?: string | null): string {
+  if (!startTime && !endTime) return 'Time TBA';
+  const formatTime = (timeStr?: string | null) => {
+    if (!timeStr) return '';
+    if (!timeStr.includes(':')) return timeStr;
+    const parts = timeStr.split(':');
+    const hours = parseInt(parts[0], 10) || 0;
+    const minutes = parseInt(parts[1], 10) || 0;
     const period = hours >= 12 ? 'PM' : 'AM';
     const hour12 = hours % 12 || 12;
     return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
+  if (!startTime) return formatTime(endTime);
+  if (!endTime) return formatTime(startTime);
   return `${formatTime(startTime)} – ${formatTime(endTime)}`;
 }
 
