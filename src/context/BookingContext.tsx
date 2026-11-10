@@ -215,10 +215,24 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!user) {
         return { success: false, error: 'Please sign in to complete your booking.' };
       }
-      if (!user.phoneNumber || user.phoneNumber.trim().length < 8) {
+
+      // Security & Anti-fake check: Validate phone strictly (valid Nepal mobile number)
+      const cleanPhone = (user.phoneNumber || '').trim().replace(/\D/g, '');
+      if (cleanPhone.length !== 10 || !/^(98|97|96)/.test(cleanPhone)) {
         return {
           success: false,
-          error: 'Please enter a valid phone number so our venue staff can confirm your booking.',
+          error: 'Please provide a valid 10-digit mobile number (e.g., 98XXXXXXXX) so our venue staff can verify your match attendance.',
+        };
+      }
+
+      // Anti-spam rate limit: Max 3 active pending orders per user
+      const userActivePending = orders.filter(
+        (o) => o.userId === user.uid && o.status === 'pending'
+      );
+      if (userActivePending.length >= 3) {
+        return {
+          success: false,
+          error: 'You already have 3 pending reservations awaiting staff call. Please wait for confirmation before reserving more.',
         };
       }
 
@@ -251,6 +265,11 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const isSat = isSaturdayDate(slot.date);
       const totalAmount = isSat ? pricing.saturdayRate : pricing.normalDayRate;
 
+      // Sanitize notes (max 150 chars, no raw HTML/scripts)
+      const sanitizedNotes = customerNote
+        ? customerNote.trim().slice(0, 150).replace(/[<>]/g, '')
+        : undefined;
+
       const newOrder: BookingOrder = {
         id: `ord-${Date.now()}`,
         sport: slot.sport,
@@ -269,14 +288,18 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         paymentStatus: 'pending',
         userId: user.uid,
         customerName: user.fullName || 'Customer',
-        customerPhone: user.phoneNumber,
+        customerPhone: cleanPhone,
         customerEmail: user.email,
         isManualBooking: false,
         status: 'pending',
-        notes: customerNote,
+        notes: sanitizedNotes,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+
+      // ─── OPTIMISTIC INSTANT LOCK (0ms Latency) ───
+      // Immediately lock slot in local state so the red/booked state appears in 0ms!
+      setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
 
       const firestore = db;
       if (isFirebaseConfigured && firestore) {
@@ -285,7 +308,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const slotRef = doc(firestore, 'slots', slot.slotId);
             const slotSnap = await tx.get(slotRef);
 
-            // Double booking prevention check
+            // Double booking prevention check on Firestore
             if (slotSnap.exists()) {
               const currentSlotData = slotSnap.data();
               if (currentSlotData.status === 'confirmed' || currentSlotData.status === 'pending') {
@@ -293,13 +316,13 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
               }
             }
 
-            // Lock slot atomically
+            // Lock slot atomically in Firestore
             tx.set(slotRef, {
               slotId: slot.slotId,
               status: 'pending',
               userId: user.uid,
               customerName: user.fullName,
-              customerPhone: user.phoneNumber,
+              customerPhone: cleanPhone,
               date: slot.date,
               startTime: slot.startTime,
               endTime: slot.endTime,
@@ -316,7 +339,12 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
               updatedAtServer: serverTimestamp(),
             });
           });
+
+          // Finalize local order with server-generated ID
+          setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id && o.slotId !== newOrder.slotId)]);
         } catch (err: any) {
+          // Rollback optimistic lock on failure
+          setOrders((prev) => prev.filter((o) => o.id !== newOrder.id));
           return {
             success: false,
             error: err.message || 'Slot reservation failed. Please refresh availability.',
@@ -324,8 +352,6 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
 
-      // Always update local state immediately so user sees it instantly
-      setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
       return { success: true, order: newOrder };
     },
     [user, orders, pricing]

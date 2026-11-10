@@ -53,15 +53,17 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       return;
     }
 
-    // Ensure phone number exists
-    if (!user.phoneNumber || user.phoneNumber.trim().length < 8) {
-      if (!phoneInput || phoneInput.trim().length < 8) {
-        setErrorMessage('Please provide a valid 10-digit mobile number so staff can confirm your request.');
-        return;
-      }
+    // Ensure valid Nepal mobile number exists
+    const cleanPhone = (user.phoneNumber || phoneInput || '').trim().replace(/\D/g, '');
+    if (cleanPhone.length !== 10 || !/^(98|97|96)/.test(cleanPhone)) {
+      setErrorMessage('Please enter a valid 10-digit Nepali mobile number starting with 98 or 97.');
+      return;
+    }
+
+    if (!user.phoneNumber || user.phoneNumber !== cleanPhone) {
       const res = await updateProfile({
         fullName: user.fullName || 'Player',
-        phoneNumber: phoneInput,
+        phoneNumber: cleanPhone,
       });
       if (!res.success) {
         setErrorMessage(res.error || 'Failed to save contact number.');

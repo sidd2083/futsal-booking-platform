@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Logo } from '@/components/common/Logo';
 import { BUSINESS_INFO } from '@/lib/constants';
 import { usePWA } from '@/context/PWAContext';
-import { MapPin, Phone, Clock, ArrowRight, ExternalLink, Download, Smartphone } from 'lucide-react';
+import { MapPin, Phone, Clock, ArrowRight, ExternalLink, Download, Smartphone, Check } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   const { promptInstall, isInstalled } = usePWA();
@@ -126,7 +126,7 @@ export const Footer: React.FC = () => {
               </div>
             </div>
 
-            {/* PWA App Download Card */}
+            {/* PWA App Status Card */}
             <div className="p-3.5 rounded-2xl bg-surface-800/80 border border-surface-700/80 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-bold text-white">
@@ -137,17 +137,26 @@ export const Footer: React.FC = () => {
                   {isInstalled ? 'Installed' : 'PWA App'}
                 </span>
               </div>
-              <p className="text-[11px] text-surface-400 leading-relaxed">
-                Add to your home screen for fast 1-tap bookings and offline ticket slips.
-              </p>
-              <button
-                type="button"
-                onClick={promptInstall}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-sm"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>{isInstalled ? 'Open Installed App' : 'Download Mobile App'}</span>
-              </button>
+              {isInstalled ? (
+                <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold py-1">
+                  <Check className="w-4 h-4" />
+                  <span>Installed & ready on home screen</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-[11px] text-surface-400 leading-relaxed">
+                    Add to your home screen for fast 1-tap bookings and offline ticket slips.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={promptInstall}
+                    className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-sm"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Install Mobile App</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 

@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="40%" stop-color="#047857"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047"/>
+      <stop offset="50%" stop-color="#EAB308"/>
+      <stop offset="100%" stop-color="#CA8A04"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Solid Background for Maskable Icon Safe Zone -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
+
+  <!-- Subtle Stadium Pitch Ring Pattern -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#10b981" stroke-width="2" stroke-opacity="0.3"/>
+  <circle cx="256" cy="256" r="170" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.15" stroke-dasharray="6 6"/>
+
+  <!-- Centered Official Shield Emblem (Fits within 80% safe zone: 512 * 0.8 = ~410px) -->
+  <g filter="url(#shadow)">
+    <!-- Shield Outer Gold Border -->
+    <path d="M 256,90 L 380,140 C 380,270 256,360 256,380 C 256,360 132,270 132,140 Z"
+          fill="#064e3b" stroke="url(#goldGrad)" stroke-width="8" stroke-linejoin="round"/>
+
+    <!-- Shield Inner Fill -->
+    <path d="M 256,106 L 366,150 C 366,260 256,342 256,360 C 256,342 146,260 146,150 Z"
+          fill="#047857" fill-opacity="0.85"/>
+
+    <!-- Pitch Grass Stripes inside shield -->
+    <path d="M 180,165 L 332,165" stroke="#ffffff" stroke-width="2" stroke-opacity="0.2"/>
+    <path d="M 160,205 L 352,205" stroke="#ffffff" stroke-width="2" stroke-opacity="0.2"/>
+    <path d="M 152,245 L 360,245" stroke="#ffffff" stroke-width="2" stroke-opacity="0.2"/>
+    <path d="M 160,285 L 352,285" stroke="#ffffff" stroke-width="2" stroke-opacity="0.2"/>
+
+    <!-- Futsal Ball / Center Motif -->
+    <g transform="translate(256, 235)">
+      <!-- Central Sports Ball Symbol -->
+      <circle cx="0" cy="0" r="48" fill="#ffffff" stroke="url(#goldGrad)" stroke-width="4"/>
+      <!-- Pentagon & Pattern -->
+      <polygon points="0,-22 20,-7 13,18 -13,18 -20,-7" fill="#064e3b"/>
+      <line x1="0" y1="-22" x2="0" y2="-48" stroke="#064e3b" stroke-width="3"/>
+      <line x1="20" y1="-7" x2="45" y2="-15" stroke="#064e3b" stroke-width="3"/>
+      <line x1="13" y1="18" x2="28" y2="38" stroke="#064e3b" stroke-width="3"/>
+      <line x1="-13" y1="18" x2="-28" y2="38" stroke="#064e3b" stroke-width="3"/>
+      <line x1="-20" y1="-7" x2="-45" y2="-15" stroke="#064e3b" stroke-width="3"/>
+    </g>
+
+    <!-- Star Top Banner -->
+    <g fill="url(#goldGrad)">
+      <polygon points="256,122 260,132 271,133 262,140 265,150 256,144 247,150 250,140 241,133 252,132" transform="scale(0.9) translate(28, 10)"/>
+      <polygon points="222,132 225,140 234,141 227,146 229,155 222,150 215,155 217,146 210,141 219,140" transform="scale(0.7) translate(95, 45)"/>
+      <polygon points="290,132 293,140 302,141 295,146 297,155 290,150 283,155 285,146 278,141 287,140" transform="scale(0.7) translate(125, 45)"/>
+    </g>
+
+    <!-- Brand Typography inside Shield -->
+    <text x="256" y="325"
+          font-family="system-ui, -apple-system, 'Inter', sans-serif"
+          font-size="24"
+          font-weight="900"
+          letter-spacing="4"
+          fill="#ffffff"
+          text-anchor="middle">
+      MAYA SPORTS
+    </text>
+
+    <text x="256" y="344"
+          font-family="system-ui, -apple-system, 'Inter', sans-serif"
+          font-size="11"
+          font-weight="800"
+          letter-spacing="2"
+          fill="url(#goldGrad)"
+          text-anchor="middle">
+      HETAUDA • NEPAL
+    </text>
+  </g>
+</svg>

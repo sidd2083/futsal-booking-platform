@@ -22,22 +22,31 @@ export const PWAProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [showIOSModal, setShowIOSModal] = useState<boolean>(false);
 
   useEffect(() => {
-    // Check if running in standalone mode (already installed as PWA)
+    // Check if running in standalone mode (already installed as PWA or launched from home screen)
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true;
+      (window.navigator as any).standalone === true ||
+      document.referrer.includes('android-app://') ||
+      localStorage.getItem('maya_pwa_installed') === 'true';
 
     if (isStandalone) {
       setIsInstalled(true);
     }
 
     const handleBeforeInstallPrompt = (e: Event) => {
+      // If already installed or detected standalone, ignore prompt
+      if (isStandalone) return;
       e.preventDefault();
       setDeferredPrompt(e);
     };
 
     const handleAppInstalled = () => {
       setIsInstalled(true);
+      try {
+        localStorage.setItem('maya_pwa_installed', 'true');
+      } catch (err) {
+        console.warn('Storage notice:', err);
+      }
       setDeferredPrompt(null);
     };
 
@@ -51,21 +60,27 @@ export const PWAProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const promptInstall = async () => {
+    if (isInstalled) return;
+
     // Check if iOS Safari
     const isIOS =
       /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
     if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choiceResult = await deferredPrompt.userChoice;
-      if (choiceResult.outcome === 'accepted') {
-        setIsInstalled(true);
+      try {
+        deferredPrompt.prompt();
+        const choiceResult = await deferredPrompt.userChoice;
+        if (choiceResult.outcome === 'accepted') {
+          setIsInstalled(true);
+          localStorage.setItem('maya_pwa_installed', 'true');
+        }
+      } catch (err) {
+        console.warn('Install prompt error:', err);
       }
       setDeferredPrompt(null);
     } else if (isIOS) {
       setShowIOSModal(true);
     } else {
-      // General prompt modal explaining how to install
       setShowIOSModal(true);
     }
   };
@@ -73,7 +88,7 @@ export const PWAProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <PWAContext.Provider
       value={{
-        canInstall: Boolean(deferredPrompt) || !isInstalled,
+        canInstall: !isInstalled,
         isInstalled,
         promptInstall,
       }}

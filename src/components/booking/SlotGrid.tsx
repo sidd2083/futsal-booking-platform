@@ -93,10 +93,10 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
             statusText = 'Under Review (Pending)';
             isClickable = false;
           } else if (isOtherConfirmed || isOtherPending) {
-            // RED: Booked or under review by another customer
+            // RED: Booked or under review by another customer - bold & unmistakable
             cardStyle =
-              'bg-red-500/95 text-white border-red-700 opacity-80 cursor-not-allowed';
-            statusText = isOtherConfirmed ? 'Booked' : 'Under Review';
+              'bg-red-600 text-white border-red-700 shadow-sm cursor-not-allowed';
+            statusText = isOtherConfirmed ? 'Booked (Occupied)' : 'Booked (Locked)';
             isClickable = false;
           } else if (isSelected) {
             // SELECTED STATE: Emerald ring with lift

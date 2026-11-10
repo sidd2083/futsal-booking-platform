@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { usePWA } from '@/context/PWAContext';
 import { AuthModal } from '@/components/common/AuthModal';
 import {
   Home,
@@ -9,14 +8,12 @@ import {
   Ticket,
   Shield,
   User,
-  Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
   const { user, isAdmin } = useAuth();
-  const { promptInstall, isInstalled } = usePWA();
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const isActive = (path: string) => {
@@ -36,7 +33,7 @@ export const MobileBottomNav: React.FC = () => {
             to="/"
             className={cn(
               'flex flex-col items-center justify-center flex-1 py-1 transition-colors',
-              isActive('/') ? 'text-emerald-700' : 'text-surface-500 hover:text-surface-900'
+              isActive('/') ? 'text-emerald-700 font-extrabold' : 'text-surface-500 hover:text-surface-900'
             )}
           >
             <Home className="w-5 h-5 mb-0.5" />
@@ -49,7 +46,7 @@ export const MobileBottomNav: React.FC = () => {
             className={cn(
               'flex flex-col items-center justify-center flex-1 py-1 transition-colors',
               isActive('/customer/bookings')
-                ? 'text-emerald-700'
+                ? 'text-emerald-700 font-extrabold'
                 : 'text-surface-500 hover:text-surface-900'
             )}
           >
@@ -71,12 +68,12 @@ export const MobileBottomNav: React.FC = () => {
               <Calendar className="w-5 h-5" />
             </div>
             <span className="text-[10px] font-black tracking-tight text-emerald-800 mt-0.5">
-              Book
+              Book Court
             </span>
           </Link>
 
-          {/* 4. Admin Command (if admin) OR Download App */}
-          {isAdmin ? (
+          {/* 4. Admin Command (if admin) */}
+          {isAdmin && (
             <Link
               to="/admin"
               className={cn(
@@ -87,22 +84,11 @@ export const MobileBottomNav: React.FC = () => {
               )}
             >
               <div className="relative">
-                <Shield className="w-5 h-5 mb-0.5" />
+                <Shield className="w-5 h-5 mb-0.5 text-emerald-700" />
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white animate-pulse" />
               </div>
-              <span className="text-[10px] font-bold tracking-tight">Admin</span>
+              <span className="text-[10px] font-bold tracking-tight text-emerald-800">Admin</span>
             </Link>
-          ) : (
-            <button
-              onClick={promptInstall}
-              type="button"
-              className="flex flex-col items-center justify-center flex-1 py-1 text-surface-500 hover:text-surface-900 transition-colors"
-            >
-              <Download className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px] font-bold tracking-tight">
-                {isInstalled ? 'App Ready' : 'Get App'}
-              </span>
-            </button>
           )}
 
           {/* 5. User / Profile / Login */}
@@ -112,7 +98,7 @@ export const MobileBottomNav: React.FC = () => {
               className={cn(
                 'flex flex-col items-center justify-center flex-1 py-1 transition-colors',
                 isActive('/customer/profile')
-                  ? 'text-emerald-700'
+                  ? 'text-emerald-700 font-extrabold'
                   : 'text-surface-500 hover:text-surface-900'
               )}
             >
