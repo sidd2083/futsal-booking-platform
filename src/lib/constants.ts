@@ -55,3 +55,50 @@ export const BUSINESS_INFO = {
     },
   ],
 };
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * NEPAL PAYMENT GATEWAY INTEGRATION CONFIGURATION (DEMO & LIVE SANDBOX)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * When you receive your official merchant credentials:
+ * 1. Set mode to 'live' (or set VITE_PAYMENT_MODE=live in .env)
+ * 2. Fill in your eSewa Merchant Code, Khalti Public/Secret Keys, or Fonepay Merchant ID.
+ * 3. The checkout automatically swaps from demo sandbox simulation to live bank endpoints!
+ */
+export const PAYMENT_GATEWAY_CONFIG = {
+  // Toggle between 'demo' and 'live'
+  mode: (import.meta.env.VITE_PAYMENT_MODE as 'demo' | 'live') || 'demo',
+
+  // 1. eSewa (Nepal's Leading Digital Wallet)
+  esewa: {
+    name: 'eSewa Mobile Wallet',
+    merchantCode: import.meta.env.VITE_ESEWA_MERCHANT_CODE || 'EPAYTEST',
+    secretKey: import.meta.env.VITE_ESEWA_SECRET_KEY || '8gBm/:&EnhH.1/q',
+    testEndpoint: 'https://rc-epay.esewa.com.np/api/epay/main/v2/form',
+    liveEndpoint: 'https://epay.esewa.com.np/api/epay/main/v2/form',
+    demoAccount: '9841000000',
+    demoMpin: '1234',
+  },
+
+  // 2. Khalti Digital Wallet
+  khalti: {
+    name: 'Khalti Digital Wallet',
+    publicKey: import.meta.env.VITE_KHALTI_PUBLIC_KEY || 'test_public_key_maya_demo_sports',
+    secretKey: import.meta.env.VITE_KHALTI_SECRET_KEY || 'test_secret_key_maya_demo',
+    testEndpoint: 'https://a.khalti.com/api/v2/epayment/initiate/',
+    liveEndpoint: 'https://khalti.com/api/v2/epayment/initiate/',
+    demoAccount: '9801000000',
+    demoOtp: '1111',
+  },
+
+  // 3. Fonepay Direct Bank Network (QR & Interbank)
+  fonepay: {
+    name: 'Fonepay Interbank QR',
+    merchantId: import.meta.env.VITE_FONEPAY_MERCHANT_ID || 'DEMO_FONEPAY_MAYA_FUTSAL',
+    acquirerId: import.meta.env.VITE_FONEPAY_ACQUIRER_ID || '01',
+    secretKey: import.meta.env.VITE_FONEPAY_SECRET_KEY || 'demo_secret_key_fonepay',
+    testEndpoint: 'https://dev-clientapi.fonepay.com/api/merchantRequest',
+    liveEndpoint: 'https://clientapi.fonepay.com/api/merchantRequest',
+  },
+};
+

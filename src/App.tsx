@@ -23,6 +23,9 @@ const FutsalBookingPage = React.lazy(() =>
 const OrderDetailsPage = React.lazy(() =>
   import('@/pages/booking/OrderDetailsPage').then((m) => ({ default: m.OrderDetailsPage }))
 );
+const PaymentCheckoutPage = React.lazy(() =>
+  import('@/pages/booking/PaymentCheckoutPage').then((m) => ({ default: m.PaymentCheckoutPage }))
+);
 const CustomerBookingsPage = React.lazy(() =>
   import('@/pages/customer/CustomerBookingsPage').then((m) => ({ default: m.CustomerBookingsPage }))
 );
@@ -56,6 +59,8 @@ export const App: React.FC = () => {
                       <Route path="/book/futsal" element={<FutsalBookingPage />} />
                       <Route path="/order/:orderId" element={<OrderDetailsPage />} />
                       <Route path="/booking/order/:orderId" element={<OrderDetailsPage />} />
+                      <Route path="/pay/:orderId" element={<PaymentCheckoutPage />} />
+                      <Route path="/checkout/payment/:orderId" element={<PaymentCheckoutPage />} />
                       <Route path="/customer/bookings" element={<CustomerBookingsPage />} />
                       <Route path="/admin" element={<AdminDashboardPage />} />
                       <Route path="*" element={<Navigate to="/" replace />} />

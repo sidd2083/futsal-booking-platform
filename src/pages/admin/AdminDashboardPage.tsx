@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useBooking } from '@/context/BookingContext';
 import { BookingOrder } from '@/types';
@@ -35,6 +35,7 @@ import {
   Coins,
   Ban,
   Bell,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -59,6 +60,7 @@ const AdminDashboardInner: React.FC = () => {
     removeClosure,
     announcement,
     updateAnnouncement,
+    refreshBookings,
   } = useBooking();
 
   // Admin login screen state
@@ -68,6 +70,51 @@ const AdminDashboardInner: React.FC = () => {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [recheckingAdmin, setRecheckingAdmin] = useState(false);
   const [recheckNotice, setRecheckNotice] = useState<string | null>(null);
+
+  // Real-Time Incoming Order Audio & Visual Alert State
+  const [newOrderAlert, setNewOrderAlert] = useState<BookingOrder | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const prevPendingLength = React.useRef(pendingOrders.length);
+  const isFirstMount = React.useRef(true);
+
+  // Sound chime & visual notification when a new pending request arrives
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      prevPendingLength.current = pendingOrders.length;
+      return;
+    }
+
+    if (pendingOrders.length > prevPendingLength.current) {
+      const newest = pendingOrders[0];
+      setNewOrderAlert(newest);
+
+      // Play soft dual-tone notification chime via Web Audio API
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.12); // G5
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.6);
+      } catch {
+        // audio policy fallback
+      }
+    }
+    prevPendingLength.current = pendingOrders.length;
+  }, [pendingOrders]);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    await refreshBookings();
+    setTimeout(() => setIsSyncing(false), 500);
+  };
 
   // Active Sidebar View
   const [activeView, setActiveView] = useState<
@@ -660,7 +707,87 @@ const AdminDashboardInner: React.FC = () => {
       </aside>
 
       {/* ─── RIGHT CONTENT WORKSPACE ─── */}
-      <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-y-auto h-full">
+      <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-y-auto h-full space-y-6">
+
+        {/* ─── TOP LIVE SYNC STATUS & CONTROLS HEADER ─── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-surface-200 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-600"></span>
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-surface-900 uppercase tracking-wider">
+                  Live Cloud Sync Active
+                </span>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                  Real-Time
+                </span>
+              </div>
+              <p className="text-[11px] text-surface-500">
+                New customer bookings &amp; online payments appear automatically in 0s.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm',
+                isSyncing
+                  ? 'bg-surface-100 text-surface-400 border-surface-200 cursor-not-allowed'
+                  : 'bg-white hover:bg-surface-50 text-surface-700 border-surface-300 hover:text-surface-900'
+              )}
+            >
+              <RefreshCw className={cn('w-3.5 h-3.5', isSyncing && 'animate-spin text-emerald-600')} />
+              <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ─── FLOATING INCOMING NEW ORDER ALERT ─── */}
+        {newOrderAlert && (
+          <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-bounce">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+                <Bell className="w-5 h-5 text-white animate-pulse" />
+              </div>
+              <div>
+                <span className="text-xs uppercase font-black tracking-wider text-amber-200 block">
+                  🔔 New Court Booking Received!
+                </span>
+                <p className="text-sm font-bold text-white">
+                  <strong>{newOrderAlert.customerName}</strong> ({newOrderAlert.customerPhone}) booked{' '}
+                  {newOrderAlert.date} at {formatSlotTime(newOrderAlert.startTime, newOrderAlert.endTime)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveView('approvals');
+                  setNewOrderAlert(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-white text-amber-900 text-xs font-black uppercase tracking-wider hover:bg-amber-50 transition-colors shadow-md"
+              >
+                Review Request Now
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewOrderAlert(null)}
+                className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 1. OVERVIEW & METRICS */}
         {activeView === 'overview' && (
@@ -847,7 +974,13 @@ const AdminDashboardInner: React.FC = () => {
                       <div>
                         <span className="text-surface-400 block text-[11px]">Payment</span>
                         <span className="font-bold text-surface-900">
-                          {order.paymentMethod === 'pay_online' ? 'Online (eSewa/Khalti)' : 'Pay on Arrival'}
+                          {order.paymentStatus === 'received' ? (
+                            <span className="text-emerald-700 font-extrabold">✓ Paid ({(order.paymentMethod || 'Online').toUpperCase()})</span>
+                          ) : order.paymentMethod === 'pay_online' ? (
+                            <span className="text-purple-700 font-bold">Online (Pending)</span>
+                          ) : (
+                            'Pay on Arrival'
+                          )}
                         </span>
                       </div>
                       <div>

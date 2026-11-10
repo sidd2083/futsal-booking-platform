@@ -317,7 +317,15 @@ export const CustomerBookingsPage: React.FC = () => {
                     <div>
                       <span className="text-surface-500 block mb-0.5">Payment</span>
                       <span className="font-semibold text-surface-700">
-                        {order.paymentMethod === 'pay_online' ? 'Online (eSewa/Khalti)' : 'Pay on Arrival'}
+                        {order.paymentStatus === 'received' ? (
+                          <span className="text-emerald-700 font-bold">✓ Paid ({(order.paymentMethod || 'Online').toUpperCase()})</span>
+                        ) : order.paymentMethod === 'pay_online' ? (
+                          <Link to={`/pay/${order.id}`} className="text-purple-700 hover:underline font-bold">
+                            Pay Online Now →
+                          </Link>
+                        ) : (
+                          'Pay on Arrival'
+                        )}
                       </span>
                     </div>
                   </div>

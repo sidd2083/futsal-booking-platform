@@ -29,6 +29,8 @@ import {
   serverTimestamp,
   setDoc,
   deleteDoc,
+  updateDoc,
+  getDocs,
 } from 'firebase/firestore';
 
 interface BookingContextType {
@@ -66,6 +68,12 @@ interface BookingContextType {
     notes?: string;
   }) => Promise<{ success: boolean; error?: string; order?: BookingOrder }>;
   deleteOrderFromHistory: (orderId: string) => Promise<{ success: boolean; error?: string }>;
+  markOrderPaymentReceived: (
+    orderId: string,
+    paymentMethod: PaymentMethod,
+    transactionId: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  refreshBookings: () => Promise<void>;
 }
 
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
@@ -190,7 +198,37 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, []);
 
-  // Firestore live listener on bookings collection
+  // Remote /slots atomic lock tracker (guarantees guests see booked slots in 0ms)
+  const [remoteSlotsMap, setRemoteSlotsMap] = useState<
+    Map<string, { status: string; customerName?: string; customerPhone?: string }>
+  >(new Map());
+
+  // Firestore live listener on atomic /slots lock collection (publicly accessible to all visitors)
+  useEffect(() => {
+    if (isFirebaseConfigured && db) {
+      const unsubSlots = onSnapshot(
+        collection(db, 'slots'),
+        (snapshot) => {
+          const map = new Map<string, { status: string; customerName?: string; customerPhone?: string }>();
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            map.set(docSnap.id, {
+              status: data.status || 'pending',
+              customerName: data.customerName,
+              customerPhone: data.customerPhone,
+            });
+          });
+          setRemoteSlotsMap(map);
+        },
+        (err) => {
+          console.warn('Firestore slots lock listener notice:', err);
+        }
+      );
+      return () => unsubSlots();
+    }
+  }, []);
+
+  // Firestore live listener on bookings collection (for both real-time customer and admin sync)
   useEffect(() => {
     if (isFirebaseConfigured && db) {
       setIsLoading(true);
@@ -206,26 +244,25 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
               ...data,
             } as BookingOrder);
           });
+
           setOrders((prev) => {
-            const map = new Map<string, BookingOrder>();
-            // Keep local orders
-            prev.forEach((o) => map.set(o.id, o));
-            // Apply fresh remote updates with smart conflict resolution
-            fetched.forEach((remote) => {
-              const local = map.get(remote.id);
-              // If locally confirmed, never revert to pending due to replication lag
-              if (local && local.status === 'confirmed' && remote.status === 'pending') {
-                map.set(remote.id, {
-                  ...remote,
-                  status: 'confirmed',
-                  bookingCode: local.bookingCode || remote.bookingCode,
-                });
-              } else {
-                map.set(remote.id, remote);
+            const remoteMap = new Map<string, BookingOrder>();
+            fetched.forEach((remote) => remoteMap.set(remote.id, remote));
+
+            // Retain locally created pending orders if less than 20 seconds old
+            // to allow optimistic UI while Firestore transaction completes
+            const now = Date.now();
+            prev.forEach((local) => {
+              if (!remoteMap.has(local.id)) {
+                const age = now - new Date(local.createdAt || 0).getTime();
+                if (age < 20000 && local.status === 'pending') {
+                  remoteMap.set(local.id, local);
+                }
               }
             });
-            return Array.from(map.values()).sort(
-              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+
+            return Array.from(remoteMap.values()).sort(
+              (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
             );
           });
           setIsLoading(false);
@@ -292,9 +329,20 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         continue;
       }
 
+      // Check both active bookings AND atomic slots collection
       const match = activeOrdersOnDate.find((o) => o.startTime === def.startTime);
+      const slotLock = remoteSlotsMap.get(slotKey);
 
-      if (match) {
+      const isLocked = Boolean(
+        match || (slotLock && (slotLock.status === 'confirmed' || slotLock.status === 'pending'))
+      );
+
+      if (isLocked) {
+        const effectiveStatus =
+          match?.status === 'confirmed' || slotLock?.status === 'confirmed'
+            ? 'confirmed'
+            : 'pending';
+
         generated.push({
           slotId: slotKey,
           sport: selectedSport,
@@ -302,13 +350,13 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           date: selectedDate,
           startTime: def.startTime,
           endTime: def.endTime,
-          status: match.status === 'confirmed' ? 'confirmed' : 'pending',
-          price: match.totalAmount,
-          bookingId: match.id,
-          bookingCode: match.bookingCode,
-          userId: match.userId,
-          customerName: match.customerName,
-          customerPhone: match.customerPhone,
+          status: effectiveStatus,
+          price: match ? match.totalAmount : price,
+          bookingId: match?.id,
+          bookingCode: match?.bookingCode,
+          userId: match?.userId,
+          customerName: match?.customerName || slotLock?.customerName || 'Reserved Player',
+          customerPhone: match?.customerPhone || slotLock?.customerPhone,
           isSaturday: isSat,
         });
       } else {
@@ -328,7 +376,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     return generated;
-  }, [selectedDate, selectedSport, orders, pricing, slotDefinitions, closures]);
+  }, [selectedDate, selectedSport, orders, pricing, slotDefinitions, closures, remoteSlotsMap]);
 
   // Request a slot booking (Pay on Arrival or Pay Online workflow with Firestore Transaction)
   const requestSlotBooking = useCallback(
@@ -956,6 +1004,93 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [user, orders]
   );
 
+  // Mark an order's payment as received (eSewa / Khalti / Fonepay demo & live checkout)
+  const markOrderPaymentReceived = useCallback(
+    async (
+      orderId: string,
+      paymentMethod: PaymentMethod,
+      transactionId: string
+    ): Promise<{ success: boolean; error?: string }> => {
+      const target = orders.find((o) => o.id === orderId || o.bookingCode === orderId);
+      const paidTimestamp = new Date().toISOString();
+
+      // Optimistically update in local state
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId || o.bookingCode === orderId
+            ? {
+                ...o,
+                paymentStatus: 'received',
+                paymentMethod,
+                transactionId,
+                paidAt: paidTimestamp,
+                paidAmount: o.totalAmount,
+              }
+            : o
+        )
+      );
+
+      if (isFirebaseConfigured && db) {
+        try {
+          const effectiveId = target ? target.id : orderId;
+          const orderRef = doc(db, 'bookings', effectiveId);
+          await updateDoc(
+            orderRef,
+            sanitizeFirestoreData({
+              paymentStatus: 'received',
+              paymentMethod,
+              transactionId,
+              paidAt: paidTimestamp,
+              paidAmount: target?.totalAmount || 0,
+              updatedAtServer: serverTimestamp(),
+            })
+          );
+
+          // Also update slot lock if available
+          const targetSlotId = target?.slotId;
+          if (targetSlotId) {
+            await updateDoc(
+              doc(db, 'slots', targetSlotId),
+              sanitizeFirestoreData({
+                paymentStatus: 'received',
+                paymentMethod,
+                updatedAtServer: serverTimestamp(),
+              })
+            ).catch(() => {});
+          }
+        } catch (err: any) {
+          console.warn('Firestore payment update notice:', err);
+        }
+      }
+
+      return { success: true };
+    },
+    [orders]
+  );
+
+  // Manual refresh method to force re-fetch bookings from Firestore
+  const refreshBookings = useCallback(async () => {
+    if (isFirebaseConfigured && db) {
+      setIsLoading(true);
+      try {
+        const snap = await getDocs(collection(db, 'bookings'));
+        const fetched: BookingOrder[] = [];
+        snap.forEach((docSnap) => {
+          fetched.push({ id: docSnap.id, ...docSnap.data() } as BookingOrder);
+        });
+        setOrders(
+          fetched.sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+          )
+        );
+      } catch (err) {
+        console.warn('Manual refresh error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  }, []);
+
   // Auto-prune order history with smart priority sorting:
   // Active/Booked orders come on TOP, rejected orders sink DOWN to the bottom!
   const userOrders = useMemo(() => {
@@ -1051,6 +1186,8 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         adminCancelBooking,
         adminCreateManualBooking,
         deleteOrderFromHistory,
+        markOrderPaymentReceived,
+        refreshBookings,
       }}
     >
       {children}

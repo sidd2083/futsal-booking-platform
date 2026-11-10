@@ -29,9 +29,12 @@ service cloud.firestore {
     }
 
     // ─── APPLICATION ENTITIES ───────────────────────────────────────────────
-    // Bookings: Authenticated users can create, read, and manage reservations.
+    // Bookings: Publicly readable so all visitors (guest or authenticated)
+    // immediately see live booked/pending court availability in real-time.
+    // Writes (create, update, delete) require authenticated user or venue staff.
     match /bookings/{bookingId} {
-      allow read, write: if isAuthenticated();
+      allow read:  if true;
+      allow write: if isAuthenticated();
     }
 
     // User Profiles:

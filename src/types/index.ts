@@ -4,7 +4,7 @@ export type SlotStatus = 'available' | 'pending' | 'confirmed' | 'disabled';
 
 export type BookingStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled' | 'expired';
 
-export type PaymentMethod = 'pay_on_arrival' | 'pay_online' | 'esewa' | 'khalti';
+export type PaymentMethod = 'pay_on_arrival' | 'pay_online' | 'esewa' | 'khalti' | 'fonepay';
 
 export type PaymentStatus = 'pending' | 'received' | 'refunded';
 
@@ -85,6 +85,9 @@ export interface BookingOrder {
   status: BookingStatus;
   rejectionReason?: string;
   notes?: string;
+  transactionId?: string;
+  paidAt?: string;
+  paidAmount?: number;
   createdAt: string;
   confirmedAt?: string;
   rejectedAt?: string;

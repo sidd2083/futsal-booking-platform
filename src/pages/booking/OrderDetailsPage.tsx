@@ -405,7 +405,9 @@ ISSUED AT      : ${new Date(order.confirmedAt || order.createdAt).toLocaleString
           {/* Payment Method */}
           <div className="p-3.5 rounded-2xl bg-surface-50 border border-surface-200 space-y-1">
             <span className="text-surface-500 font-bold flex items-center gap-1.5 text-xs">
-              {order.paymentMethod === 'pay_online' ? (
+              {order.paymentStatus === 'received' ? (
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+              ) : order.paymentMethod === 'pay_online' ? (
                 <QrCode className="w-3.5 h-3.5 text-purple-700" />
               ) : (
                 <Wallet className="w-3.5 h-3.5 text-emerald-700" />
@@ -413,12 +415,20 @@ ISSUED AT      : ${new Date(order.confirmedAt || order.createdAt).toLocaleString
               Payment Method
             </span>
             <span className="font-black text-surface-900 block">
-              {order.paymentMethod === 'pay_online'
-                ? 'Pay Online (eSewa / Khalti)'
+              {order.paymentStatus === 'received'
+                ? `Paid via ${(order.paymentMethod || 'Online').toUpperCase()}`
+                : order.paymentMethod === 'pay_online'
+                ? 'Online Payment (eSewa / Khalti / Fonepay)'
                 : 'Pay on Arrival at Counter'}
             </span>
-            <span className="text-[11px] text-surface-500">
-              {order.paymentStatus === 'received' ? '✓ Payment Received' : 'Payment Pending at Venue'}
+            <span className="text-[11px] font-semibold text-surface-600 block">
+              {order.paymentStatus === 'received' ? (
+                <span className="text-emerald-700 font-bold">
+                  ✓ Paid &amp; Verified {order.transactionId ? `• Ref: ${order.transactionId}` : ''}
+                </span>
+              ) : (
+                <span>Payment Pending (Payable at venue or online)</span>
+              )}
             </span>
           </div>
 
@@ -462,6 +472,19 @@ ISSUED AT      : ${new Date(order.confirmedAt || order.createdAt).toLocaleString
 
       {/* ACTION SUITE */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+        {order.paymentStatus !== 'received' && order.status !== 'rejected' && (
+          <Link to={`/pay/${order.id}`} className="w-full sm:w-auto">
+            <Button
+              variant="primary"
+              size="md"
+              className="w-full sm:w-auto font-black bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-lg hover:from-emerald-700 hover:to-teal-800"
+              leftIcon={<QrCode className="w-4 h-4" />}
+            >
+              Pay Online (eSewa / Khalti / Fonepay)
+            </Button>
+          </Link>
+        )}
+
         <Link to="/customer/bookings" className="w-full sm:w-auto">
           <Button variant="outline" size="md" className="w-full sm:w-auto font-bold bg-white">
             View All My Bookings

@@ -41,7 +41,11 @@ export const FutsalBookingPage: React.FC = () => {
 
   const handleBookingConfirmed = (order: BookingOrder) => {
     setIsConfirmModalOpen(false);
-    navigate(`/order/${order.id}`);
+    if (order.paymentMethod === 'pay_online') {
+      navigate(`/pay/${order.id}`);
+    } else {
+      navigate(`/order/${order.id}`);
+    }
   };
 
   return (
