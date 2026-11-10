@@ -69,7 +69,7 @@ export const MobileBottomNav: React.FC = () => {
             to="/book"
             className="flex flex-col items-center justify-center -mt-5 transition-transform active:scale-95"
           >
-            <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-emerald-800 via-emerald-700 to-emerald-600 text-white flex items-center justify-center shadow-lg border-2 border-white ring-2 ring-emerald-500/20">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-emerald-800 via-emerald-700 to-emerald-600 text-white flex items-center justify-center shadow-lg border-2 border-white ring-2 ring-emerald-500/20">
               <Calendar className="w-5 h-5" />
             </div>
             <span className="text-[10px] font-black tracking-tight text-emerald-800 mt-1 whitespace-nowrap">

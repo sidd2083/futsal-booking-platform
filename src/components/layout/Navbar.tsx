@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { user, isAdmin, logout, updateProfile, needsProfileCompletion, dismissProfileCompletion } = useAuth();
+  const { user, isAdmin, logout, updateProfile, dismissProfileCompletion } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -245,9 +245,9 @@ export const Navbar: React.FC = () => {
         onClose={() => setAuthModalOpen(false)}
       />
 
-      {/* Profile Modal (Required for phone verification) */}
+      {/* Profile Modal (Accessible from user profile dropdown) */}
       <Modal
-        isOpen={profileModalOpen || needsProfileCompletion}
+        isOpen={profileModalOpen}
         onClose={() => {
           setProfileModalOpen(false);
           dismissProfileCompletion();

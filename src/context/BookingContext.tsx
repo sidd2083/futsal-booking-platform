@@ -16,6 +16,7 @@ import {
   generateHourlySlotDefinitions,
   getNepalTodayFormatted,
   isSlotPassedInNepal,
+  sanitizeFirestoreData,
 } from '@/lib/utils';
 import { useAuth } from './AuthContext';
 import { db, isFirebaseConfigured } from '@/lib/firebase';
@@ -405,7 +406,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // Sanitize notes (max 150 chars, no raw HTML/scripts)
       const sanitizedNotes = customerNote
         ? customerNote.trim().slice(0, 150).replace(/[<>]/g, '')
-        : undefined;
+        : '';
 
       const newOrder: BookingOrder = {
         id: `ord-${Date.now()}`,
@@ -424,9 +425,9 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         paymentMethod: paymentMethod || 'pay_on_arrival',
         paymentStatus: 'pending',
         userId: user.uid,
-        customerName: user.fullName || 'Customer',
+        customerName: (user.fullName || 'Customer').trim(),
         customerPhone: cleanPhone,
-        customerEmail: user.email,
+        customerEmail: user.email || '',
         isManualBooking: false,
         status: 'pending',
         notes: sanitizedNotes,
@@ -453,28 +454,28 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
               }
             }
 
-            // Lock slot atomically in Firestore
-            tx.set(slotRef, {
+            // Lock slot atomically in Firestore (clean data - NO undefined values)
+            tx.set(slotRef, sanitizeFirestoreData({
               slotId: slot.slotId,
               status: 'pending',
               userId: user.uid,
-              customerName: user.fullName,
+              customerName: user.fullName || 'Customer',
               customerPhone: cleanPhone,
               date: slot.date,
               startTime: slot.startTime,
               endTime: slot.endTime,
               sport: slot.sport,
               lockedAt: serverTimestamp(),
-            });
+            }));
 
-            // Record booking document
+            // Record booking document (clean data - NO undefined values)
             const orderRef = doc(collection(firestore, 'bookings'));
             newOrder.id = orderRef.id;
-            tx.set(orderRef, {
+            tx.set(orderRef, sanitizeFirestoreData({
               ...newOrder,
               createdAtServer: serverTimestamp(),
               updatedAtServer: serverTimestamp(),
-            });
+            }));
           });
 
           // Finalize local order with server-generated ID
@@ -506,13 +507,13 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const orderRef = doc(firestore, 'bookings', orderId);
           await setDoc(
             orderRef,
-            {
+            sanitizeFirestoreData({
               status: 'confirmed',
               bookingCode: code,
               confirmedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               updatedAtServer: serverTimestamp(),
-            },
+            }),
             { merge: true }
           );
 
@@ -520,11 +521,11 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const slotRef = doc(firestore, 'slots', target.slotId);
             await setDoc(
               slotRef,
-              {
+              sanitizeFirestoreData({
                 status: 'confirmed',
                 bookingCode: code,
                 confirmedAt: serverTimestamp(),
-              },
+              }),
               { merge: true }
             );
           }
@@ -563,13 +564,13 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const orderRef = doc(firestore, 'bookings', orderId);
           await setDoc(
             orderRef,
-            {
+            sanitizeFirestoreData({
               status: 'rejected',
               rejectionReason: reason || 'Declined by venue manager',
               rejectedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               updatedAtServer: serverTimestamp(),
-            },
+            }),
             { merge: true }
           );
 
@@ -626,13 +627,13 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const orderRef = doc(firestore, 'bookings', effectiveOrderId);
             await setDoc(
               orderRef,
-              {
+              sanitizeFirestoreData({
                 status: 'cancelled',
                 cancellationReason: reason || 'Cancelled by staff / player request',
                 cancelledAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 updatedAtServer: serverTimestamp(),
-              },
+              }),
               { merge: true }
             );
           }
@@ -695,11 +696,11 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         paymentMethod: 'pay_on_arrival',
         paymentStatus: 'received',
         userId: 'admin_counter_desk',
-        customerName: params.customerName,
-        customerPhone: params.customerPhone,
+        customerName: params.customerName.trim(),
+        customerPhone: params.customerPhone.trim(),
         isManualBooking: true,
         status: 'confirmed',
-        notes: params.notes,
+        notes: params.notes || '',
         createdAt: new Date().toISOString(),
         confirmedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -712,25 +713,25 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           manualOrder.id = orderRef.id;
           const slotRef = doc(firestore, 'slots', slotId);
 
-          // Write slot lock and booking record in parallel
+          // Write slot lock and booking record in parallel (clean data - NO undefined values)
           await Promise.all([
-            setDoc(slotRef, {
+            setDoc(slotRef, sanitizeFirestoreData({
               slotId,
               status: 'confirmed',
               bookingCode: code,
-              customerName: params.customerName,
-              customerPhone: params.customerPhone,
+              customerName: params.customerName.trim(),
+              customerPhone: params.customerPhone.trim(),
               date: params.date,
               startTime: params.startTime,
               endTime: params.endTime,
               sport: 'football',
               lockedAt: serverTimestamp(),
-            }),
-            setDoc(orderRef, {
+            })),
+            setDoc(orderRef, sanitizeFirestoreData({
               ...manualOrder,
               createdAtServer: serverTimestamp(),
               updatedAtServer: serverTimestamp(),
-            }),
+            })),
           ]);
         } catch (err: any) {
           console.warn('Firestore offline sync notice (saved locally):', err);
@@ -762,7 +763,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (isFirebaseConfigured && db) {
         try {
-          await setDoc(doc(db, 'settings', 'pricing'), updated, { merge: true });
+          await setDoc(doc(db, 'settings', 'pricing'), sanitizeFirestoreData(updated), { merge: true });
         } catch (err: any) {
           console.warn('Firestore pricing sync notice:', err);
         }
@@ -786,7 +787,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         try {
           const docRef = doc(collection(db, 'courtClosures'));
           newClosure.id = docRef.id;
-          await setDoc(docRef, newClosure);
+          await setDoc(docRef, sanitizeFirestoreData(newClosure));
         } catch (err: any) {
           console.warn('Firestore closure sync notice:', err);
         }
@@ -833,7 +834,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (isFirebaseConfigured && db) {
         try {
-          await setDoc(doc(db, 'settings', 'announcement'), updated, { merge: true });
+          await setDoc(doc(db, 'settings', 'announcement'), sanitizeFirestoreData(updated), { merge: true });
         } catch (err: any) {
           console.warn('Firestore announcement sync notice:', err);
         }

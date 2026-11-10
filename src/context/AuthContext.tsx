@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile, AuthProviderType } from '@/types';
 import { auth, googleProvider, db, isFirebaseConfigured } from '@/lib/firebase';
+import { sanitizeFirestoreData } from '@/lib/utils';
 import {
   signInWithPopup,
   signOut as fbSignOut,
@@ -75,27 +76,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!db) return false;
     try {
       const cleanEmail = email?.trim().toLowerCase();
-
-      // Quick parallel lookup for admin identity
-      const checks: Promise<boolean>[] = [
-        getDoc(doc(db, 'adminUsers', uid)).then((s) => s.exists()),
-        getDoc(doc(db, 'admins', uid)).then((s) => s.exists()),
-        getDoc(doc(db, 'users', uid)).then((s) => {
-          if (!s.exists()) return false;
-          const d = s.data();
-          return d.role?.toLowerCase() === 'admin' || d.isAdmin === true;
-        }),
+      const checks: Promise<any>[] = [
+        getDoc(doc(db, 'adminUsers', uid)),
+        getDoc(doc(db, 'admins', uid)),
       ];
-
       if (cleanEmail) {
-        checks.push(getDoc(doc(db, 'adminUsers', cleanEmail)).then((s) => s.exists()));
-        checks.push(getDoc(doc(db, 'admins', cleanEmail)).then((s) => s.exists()));
+        checks.push(getDoc(doc(db, 'adminUsers', cleanEmail)));
       }
 
-      // 2-second timeout protection so auth never hangs
-      const timeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000));
-      const anyMatch = Promise.all(checks).then((results) => results.some(Boolean));
-      return await Promise.race([anyMatch, timeout]);
+      // Fast 1.2-second timeout protection so auth never delays
+      const timeout = new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 1200));
+      const snaps = await Promise.race([Promise.all(checks), timeout]);
+      return snaps.some((s) => s && typeof s.exists === 'function' && s.exists());
     } catch (err) {
       console.warn('Admin check warning:', err);
       return false;
@@ -105,7 +97,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sync profile from Firestore for a given Firebase User
   const syncUserProfile = useCallback(
     async (fbUser: FirebaseUser, providerType: AuthProviderType = 'google') => {
-      if (!db) return;
+      // 0ms instant hydration from current auth object
+      const nowIso = new Date().toISOString();
+      const fallbackProfile: UserProfile = {
+        uid: fbUser.uid,
+        fullName: fbUser.displayName || '',
+        email: fbUser.email || '',
+        phoneNumber: fbUser.phoneNumber || '',
+        authProvider: providerType,
+        photoURL: fbUser.photoURL || '',
+        role: 'customer',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      if (!db) {
+        setUser(fallbackProfile);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(fallbackProfile));
+        return;
+      }
 
       try {
         const userRef = doc(db, 'users', fbUser.uid);
@@ -118,48 +128,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const profileData = snap.data() as UserProfile;
           const merged: UserProfile = {
             ...profileData,
+            fullName: profileData.fullName || fbUser.displayName || '',
+            email: profileData.email || fbUser.email || '',
+            phoneNumber: profileData.phoneNumber || fbUser.phoneNumber || '',
+            photoURL: profileData.photoURL || fbUser.photoURL || '',
             role: adminStatus ? 'admin' : (profileData.role || 'customer'),
           };
           setUser(merged);
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
 
-          // Check if profile is missing phone number or name
-          if (!profileData.phoneNumber || profileData.phoneNumber.trim().length < 8) {
+          // Prompt profile completion if phone or name is missing
+          if (!merged.phoneNumber || merged.phoneNumber.trim().length < 8 || !merged.fullName || merged.fullName.trim().length < 2) {
             setNeedsProfileCompletion(true);
           } else {
             setNeedsProfileCompletion(false);
           }
         } else {
           // First-time registration entry
-          const nowIso = new Date().toISOString();
           const newProfile: UserProfile = {
             uid: fbUser.uid,
             fullName: fbUser.displayName || '',
             email: fbUser.email || '',
             phoneNumber: fbUser.phoneNumber || '',
             authProvider: providerType,
-            photoURL: fbUser.photoURL || undefined,
+            photoURL: fbUser.photoURL || '',
             role: adminStatus ? 'admin' : 'customer',
             createdAt: nowIso,
             updatedAt: nowIso,
           };
 
-          await setDoc(userRef, {
+          await setDoc(userRef, sanitizeFirestoreData({
             ...newProfile,
             createdAtServer: serverTimestamp(),
             updatedAtServer: serverTimestamp(),
-          });
+          }));
 
           setUser(newProfile);
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newProfile));
 
-          // Prompt profile completion if phone or name is missing
-          if (!newProfile.phoneNumber || newProfile.phoneNumber.trim().length < 8 || !newProfile.fullName) {
+          if (!newProfile.phoneNumber || newProfile.phoneNumber.trim().length < 8 || !newProfile.fullName || newProfile.fullName.trim().length < 2) {
             setNeedsProfileCompletion(true);
+          } else {
+            setNeedsProfileCompletion(false);
           }
         }
       } catch (error) {
         console.error('Error synchronizing Firestore user profile:', error);
+        // Fallback to auth identity if Firestore times out
+        setUser(fallbackProfile);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(fallbackProfile));
       }
     },
     [checkAdminRole]
@@ -332,11 +349,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       // Save user document
-      await setDoc(doc(db, 'users', uid), {
+      await setDoc(doc(db, 'users', uid), sanitizeFirestoreData({
         ...profile,
+        photoURL: profile.photoURL || '',
         createdAtServer: serverTimestamp(),
         updatedAtServer: serverTimestamp(),
-      });
+      }));
 
       // Claim phone number in local cache
       try {
@@ -350,11 +368,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Claim phone number in Firestore registry
       try {
-        await setDoc(doc(db, 'phoneRegistry', cleanPhone), {
+        await setDoc(doc(db, 'phoneRegistry', cleanPhone), sanitizeFirestoreData({
           uid,
           email: cleanEmail,
           createdAt: serverTimestamp(),
-        });
+        }));
       } catch (err) {
         console.warn('Failed to write phone registry:', err);
       }
@@ -384,10 +402,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-      // Run profile sync in background so login returns immediately
-      syncUserProfile(cred.user, 'password').catch((err) =>
-        console.warn('Background sync error (non-fatal):', err)
-      );
+      // Synchronize profile immediately before resolving
+      await syncUserProfile(cred.user, 'password');
       return { success: true };
     } catch (err: any) {
       return { success: false, error: formatAuthError(err) };
@@ -425,11 +441,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         // Claim phone in registry
-        await setDoc(doc(db, 'phoneRegistry', cleanPhone), {
+        await setDoc(doc(db, 'phoneRegistry', cleanPhone), sanitizeFirestoreData({
           uid: user.uid,
-          email: user.email,
+          email: user.email || '',
           updatedAt: serverTimestamp(),
-        });
+        }));
       } catch (err) {
         console.warn('Phone registry check error:', err);
       }
@@ -446,12 +462,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await setDoc(
           doc(db, 'users', user.uid),
-          {
+          sanitizeFirestoreData({
             fullName: updated.fullName,
             phoneNumber: updated.phoneNumber,
             updatedAt: updated.updatedAt,
             updatedAtServer: serverTimestamp(),
-          },
+          }),
           { merge: true }
         );
       } catch (err: any) {

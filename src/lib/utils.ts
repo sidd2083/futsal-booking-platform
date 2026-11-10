@@ -114,3 +114,28 @@ export function generateBookingCode(sport: 'football' | 'cricket' = 'football'):
   const random = Math.floor(1000 + Math.random() * 9000);
   return `${prefix}-${random}`;
 }
+
+/**
+ * Recursively cleans an object so that no property contains `undefined`.
+ * Firestore throws a fatal error if any field in setDoc, updateDoc, or tx.set is `undefined`.
+ */
+export function sanitizeFirestoreData<T extends Record<string, any>>(data: T): Record<string, any> {
+  if (!data || typeof data !== 'object') return data;
+  const clean: Record<string, any> = {};
+  for (const [key, val] of Object.entries(data)) {
+    if (val !== undefined) {
+      if (
+        val &&
+        typeof val === 'object' &&
+        !Array.isArray(val) &&
+        !(val instanceof Date) &&
+        val.constructor?.name === 'Object'
+      ) {
+        clean[key] = sanitizeFirestoreData(val);
+      } else {
+        clean[key] = val;
+      }
+    }
+  }
+  return clean;
+}
